@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+*/node_modules/
+package-lock.json.bak
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment & Secrets (Crucial: Keep local DB credentials private)
+.env
+.env*.local
+*.env
+backend/.env
+mobile/.env
+
+# Expo & Mobile Build Artifacts
+.expo/
+*/.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native Builds
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+/ios
+/android
+mobile/ios
+mobile/android
+
+# Metro & Bundlers
+.metro-health-check*
+*.tsbuildinfo
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporary scripts and logs
+*.log
+backend/*.txt
+scratch/
+.system_generated/

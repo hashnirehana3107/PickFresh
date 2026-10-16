@@ -1,0 +1,165 @@
+{
+  "products": [
+    {
+      "id": "prod_1",
+      "_id": "670000000000000000000001",
+      "name": "Fresh Red Tomatoes",
+      "category": "Vegetables",
+      "price": 320,
+      "unit": "1kg",
+      "stock": 45,
+      "minStock": 10,
+      "status": "IN STOCK",
+      "storeName": "Green Basket Grocery - Colombo 03",
+      "brand": "Organic",
+      "image": "/cat_veg.png"
+    },
+    {
+      "id": "prod_2",
+      "_id": "670000000000000000000002",
+      "name": "Green Beans",
+      "category": "Vegetables",
+      "price": 280,
+      "unit": "1kg",
+      "stock": 8,
+      "minStock": 10,
+      "status": "LOW STOCK",
+      "storeName": "Green Basket Grocery - Colombo 03",
+      "brand": "Farm Fresh",
+      "image": "/cat_veg.png"
+    },
+    {
+      "id": "prod_3",
+      "_id": "670000000000000000000003",
+      "name": "Highland Fresh Milk 1L",
+      "category": "Dairy",
+      "price": 450,
+      "unit": "1L",
+      "stock": 25,
+      "minStock": 5,
+      "status": "IN STOCK",
+      "storeName": "Lanka Mart - Nugegoda",
+      "brand": "Highland",
+      "image": "/dairy.jpg"
+    },
+    {
+      "id": "prod_4",
+      "_id": "670000000000000000000004",
+      "name": "7Up Pet Bottle 1.5L",
+      "category": "Beverages",
+      "price": 380,
+      "unit": "1.5L",
+      "stock": 30,
+      "minStock": 5,
+      "status": "IN STOCK",
+      "storeName": "QuickPick Express - Dehiwala",
+      "brand": "7Up",
+      "image": "/assets/7 Up Pet Bottle 1.5L.jpg"
+    },
+    {
+      "id": "prod_5",
+      "_id": "670000000000000000000005",
+      "name": "Fresh Carrots",
+      "category": "Vegetables",
+      "price": 240,
+      "unit": "1kg",
+      "stock": 18,
+      "minStock": 5,
+      "status": "IN STOCK",
+      "storeName": "Green Basket Grocery - Colombo 03",
+      "brand": "Nuwara Eliya",
+      "image": "/cat_veg.png"
+    }
+  ],
+  "categories": [
+    {
+      "id": "cat_1",
+      "_id": "670000000000000000000011",
+      "name": "Vegetables",
+      "fallbackEmoji": "🥕",
+      "color": "#E8F5E9",
+      "textColor": "#2E7D32",
+      "image": "/veg_icon.png"
+    },
+    {
+      "id": "cat_2",
+      "_id": "670000000000000000000012",
+      "name": "Fruits",
+      "fallbackEmoji": "🥑",
+      "color": "#FFF3E0",
+      "textColor": "#E65100",
+      "image": "/fruit_icon.png"
+    },
+    {
+      "id": "cat_3",
+      "_id": "670000000000000000000013",
+      "name": "Dairy",
+      "fallbackEmoji": "🥛",
+      "color": "#E3F2FD",
+      "textColor": "#1565C0",
+      "image": "/dairy_icon.png"
+    },
+    {
+      "id": "cat_4",
+      "_id": "670000000000000000000014",
+      "name": "Bakery",
+      "fallbackEmoji": "🍞",
+      "color": "#FCE4EC",
+      "textColor": "#C2185B",
+      "image": "/bakery_icon.png"
+    },
+    {
+      "id": "cat_5",
+      "_id": "670000000000000000000015",
+      "name": "Beverages",
+      "fallbackEmoji": "🥤",
+      "color": "#FFF3E0",
+      "textColor": "#E65100",
+      "image": ""
+    },
+    {
+      "id": "cat_6",
+      "_id": "670000000000000000000016",
+      "name": "Grocery",
+      "fallbackEmoji": "📦",
+      "color": "#E8F5E9",
+      "textColor": "#2E7D32",
+      "image": ""
+    }
+  ],
+  "stores": [
+    {
+      "id": "st_1",
+      "_id": "670000000000000000000021",
+      "name": "Green Basket Grocery - Colombo 03",
+      "ownerName": "Saman Perera",
+      "address": "124 Galle Rd, Colombo 03",
+      "distance": "1.2 km",
+      "rating": "4.9 ★",
+      "status": "Open • Pick up in 15m",
+      "storeStatus": "open"
+    },
+    {
+      "id": "st_2",
+      "_id": "670000000000000000000022",
+      "name": "Lanka Mart - Nugegoda",
+      "ownerName": "Nimal Silva",
+      "address": "45 High Level Rd, Nugegoda",
+      "distance": "2.4 km",
+      "rating": "4.8 ★",
+      "status": "Open • Pick up in 15m",
+      "storeStatus": "open"
+    },
+    {
+      "id": "st_3",
+      "_id": "670000000000000000000023",
+      "name": "QuickPick Express - Dehiwala",
+      "ownerName": "Kamal Fernando",
+      "address": "88 Hill Street, Dehiwala",
+      "distance": "3.1 km",
+      "rating": "4.7 ★",
+      "status": "Open • Pick up in 15m",
+      "storeStatus": "open"
+    }
+  ]
+}
