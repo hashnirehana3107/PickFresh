@@ -20,6 +20,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 
 const DEFAULT_CATEGORIES = [
     { name: 'Dairy', fallbackEmoji: '🥛', image: '' },
@@ -159,7 +160,12 @@ export default function EditProductPage({ onNavigate, product }) {
         reader.readAsDataURL(file);
     };
 
-    const handlePickImage = () => {
+    const handlePickImage = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.7 });
+            if (uri) setImagePreview(uri);
+            return;
+        }
         if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';

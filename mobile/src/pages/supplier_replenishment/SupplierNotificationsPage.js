@@ -88,9 +88,6 @@ export default function SupplierNotificationsScreen({ onNavigate }) {
     }, [user?.email]);
 
     const handleAddTestNotification = async () => {
-        try {
-            Vibration.vibrate([150, 50, 150]);
-        } catch (e) { }
 
         const title = `⚡ Live Restock PO #${Math.floor(800 + Math.random() * 100)}`;
         const message = 'Fresh Super Store requested 30 units Anchor Milk 400g.';

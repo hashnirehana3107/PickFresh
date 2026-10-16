@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CITIES_LIST = [
@@ -303,9 +304,38 @@ export default function ProfilePage({ onNavigate, lastOrder, onOrderCancelled })
         }
     };
 
-    // Web-compatible image picker
-    const triggerImagePicker = () => {
-        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    // Universal image picker (works on Android APK, iOS, Web)
+    const triggerImagePicker = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.6 });
+            if (uri) {
+                setImageLoadError(false);
+                setProfileImage(uri);
+                if (updateUser) {
+                    await updateUser({ picture: uri });
+                }
+                const reqEmail = email || user?.email;
+                if (reqEmail) {
+                    try {
+                        await fetch(`${API_BASE_URL}/auth/update-profile`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                email: reqEmail,
+                                id: user?.id || user?._id,
+                                picture: uri
+                            })
+                        });
+                    } catch (e) {
+                        console.warn('Direct image save err:', e);
+                    }
+                }
+                setSaveMessage('Profile picture updated & synced with database!');
+                setTimeout(() => setSaveMessage(''), 3000);
+            }
+            return;
+        }
+        if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';

@@ -39,6 +39,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 
 // Subpage screens
 import ProductListPage from './ProductListPage';
@@ -97,111 +98,13 @@ export default function ShopOwnerDashboard({ onNavigate }) {
         }
     };
 
-    // Dynamic Stats State strictly from MongoDB Atlas Backend
-    const [stats, setStats] = useState({
-        totalProducts: 22,
-        lowStockCount: 5,
-        outOfStockCount: 1,
-        todaySales: 0,
-        activePickups: 6,
-    });
-
+    // Dynamic Stats State strictly from MongoDB Atlas Backend (starts null to show clean loading indicator without fake data)
+    const [stats, setStats] = useState(null);
     const [recentActivity, setRecentActivity] = useState([]);
-    const [isLoadingStats, setIsLoadingStats] = useState(false);
+    const [isLoadingStats, setIsLoadingStats] = useState(true);
 
     // Shop Owner Specific Notifications Data strictly from MongoDB Atlas Backend
-    const [notifications, setNotifications] = useState(shopOwnerDashboardCache?.notifications || [
-        {
-            id: 'ord_6acf39c1483aef103782f004',
-            title: 'New Customer Pre-Order #PF-F004',
-            message: 'Kiara Fernando placed a pickup order (2 items • Rs. 700).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6acf35b5483aef103782eb62',
-            title: 'New Customer Pre-Order #PF-EB62',
-            message: 'Kiara Fernando placed a pickup order (1 item • Rs. 650).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6acf3572483aef103782eb11',
-            title: 'New Customer Pre-Order #PF-EB11',
-            message: 'Guest Customer placed a pickup order (1 item • Rs. 300).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6acf354e483aef103782eaec',
-            title: 'New Customer Pre-Order #PF-EAEC',
-            message: 'Guest Customer placed a pickup order (1 item • Rs. 650).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6accf8d293f8284dc3c15b21',
-            title: 'New Customer Pre-Order #PF-5B21',
-            message: 'achala placed a pickup order (1 item • Rs. 660).',
-            time: '2d ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'sup_6aca99a78ca7a309ae4fc919',
-            title: 'Supplier Delivery Pending Approval',
-            message: 'Lanka Mega Wholesale Distributors shipment #PO-0003 status is Pending Approval.',
-            time: '3d ago',
-            type: 'supplier',
-            targetTab: 'suppliers',
-            read: false,
-        },
-        {
-            id: 'sup_6ac97d554e3dad798e73ec07',
-            title: 'Supplier Delivery Delivered',
-            message: 'Central Food City shipment #PO-0002 status is Delivered.',
-            time: '4d ago',
-            type: 'supplier',
-            targetTab: 'suppliers',
-            read: false,
-        },
-        {
-            id: 'stk_6ac67f0971f7f3cd1a3104f1',
-            title: 'Critical Low Stock Warning',
-            message: 'Coca Cola Pet Bottle 1.05L is down to 1 bottle in stock. Reorder recommended.',
-            time: '7d ago',
-            type: 'stock',
-            targetTab: 'inventory',
-            read: false,
-        },
-        {
-            id: 'stk_6ac67d7b71f7f3cd1a310262',
-            title: 'Critical Low Stock Warning',
-            message: 'Ratthi Full Cream Milk Powder - 400g is down to 0 pack in stock. Reorder recommended.',
-            time: '7d ago',
-            type: 'stock',
-            targetTab: 'inventory',
-            read: false,
-        },
-        {
-            id: 'stk_6ac67af771f7f3cd1a30fe23',
-            title: 'Critical Low Stock Warning',
-            message: 'Bitter Gourd is down to 3 1kg in stock. Reorder recommended.',
-            time: '7d ago',
-            type: 'stock',
-            targetTab: 'inventory',
-            read: false,
-        },
-    ]);
+    const [notifications, setNotifications] = useState(shopOwnerDashboardCache?.notifications || []);
     const unreadCount = notifications.filter((n) => !n.read).length;
     const bellShakeAnim = useRef(new Animated.Value(0)).current;
 
@@ -244,8 +147,13 @@ export default function ShopOwnerDashboard({ onNavigate }) {
         setShowBannerModal(true);
     };
 
-    const handlePickBannerImage = () => {
-        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const handlePickBannerImage = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [16, 9], quality: 0.7 });
+            if (uri) setEditBannerBg(uri);
+            return;
+        }
+        if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
@@ -270,6 +178,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
     const storeTitle = user?.shopName || user?.storeName || user?.name || 'GroceryMart';
 
     const fetchDashboardData = async () => {
+        setIsLoadingStats(true);
         try {
             const storeEmail = user?.email || 'grocerymart@gmail.com';
             const res = await fetch(
@@ -280,7 +189,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             const data = await res.json();
             if (data.success && data.stats) {
                 setStats((prev) => ({
-                    ...prev,
+                    ...(prev || {}),
                     ...data.stats,
                 }));
             }
@@ -289,6 +198,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             }
         } catch (err) {
             console.warn('Dashboard fetch err:', err);
+        } finally {
+            setIsLoadingStats(false);
         }
     };
 
@@ -311,11 +222,17 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                     const s = (o.status || '').toLowerCase();
                     return s === 'pending' || s === 'preparing' || s === 'ready for pickup';
                 }).length;
-                setStats((prev) => ({ ...prev, activePickups: activeCount }));
+                setStats((prev) => ({ ...(prev || {}), activePickups: activeCount }));
             }
         } catch (e) {
             console.warn('Orders count fetch err:', e);
         }
+    };
+
+    const fetchDashboardStats = () => {
+        fetchDashboardData();
+        fetchOrderStats();
+        fetchNotifications();
     };
 
     const fetchOfferBanner = async () => {
@@ -367,42 +284,18 @@ export default function ShopOwnerDashboard({ onNavigate }) {
     };
 
     const handleBellClick = () => {
-        try {
-            Vibration.vibrate(100);
-            if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate([100, 50, 100]);
-            }
-        } catch (e) {}
         setShowNotifSheet((prev) => !prev);
     };
 
     const handleMarkAllRead = () => {
-        try {
-            Vibration.cancel();
-            if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(0);
-            }
-        } catch (e) {}
         setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     };
 
     const handleClearAll = () => {
-        try {
-            Vibration.cancel();
-            if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(0);
-            }
-        } catch (e) {}
         setNotifications([]);
     };
 
     const handleNotificationClick = (notif) => {
-        try {
-            Vibration.cancel();
-            if (typeof window !== 'undefined' && window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(0);
-            }
-        } catch (e) {}
         setNotifications((prev) =>
             prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
         );
@@ -414,15 +307,13 @@ export default function ShopOwnerDashboard({ onNavigate }) {
         }
     };
 
-    // Continuous vibration loop and ringing bell shake animation when unread notifications arrive
+    // Ringing bell shake animation when unread notifications arrive (vibration removed as requested)
     useEffect(() => {
-        let vibrateInterval = null;
         let loopAnim = null;
         const hasUnread = unreadCount > 0;
         const isViewingNotifications = showNotifSheet || activeTab === 'notifications';
 
         if (hasUnread && !isViewingNotifications) {
-            // Visual Bell Shake Animation Loop
             const shake = Animated.sequence([
                 Animated.timing(bellShakeAnim, { toValue: 14, duration: 100, useNativeDriver: true }),
                 Animated.timing(bellShakeAnim, { toValue: -14, duration: 100, useNativeDriver: true }),
@@ -436,43 +327,14 @@ export default function ShopOwnerDashboard({ onNavigate }) {
 
             loopAnim = Animated.loop(shake);
             loopAnim.start();
-
-            // Initial vibration
-            try {
-                if (Platform.OS === 'android') {
-                    Vibration.vibrate([400, 500, 500, 500], true);
-                } else if (Platform.OS === 'ios') {
-                    Vibration.vibrate([300, 200, 300]);
-                }
-            } catch (err) {}
-
-            // Repeating interval for iOS
-            vibrateInterval = setInterval(() => {
-                try {
-                    if (Platform.OS === 'ios') {
-                        Vibration.vibrate([300, 200, 300]);
-                    }
-                } catch (err) {}
-            }, 3000);
         } else {
             if (loopAnim) loopAnim.stop();
             bellShakeAnim.setValue(0);
-            try {
-                if (Platform.OS !== 'web') {
-                    Vibration.cancel();
-                }
-            } catch (err) {}
         }
 
         return () => {
             if (loopAnim) loopAnim.stop();
             bellShakeAnim.setValue(0);
-            if (vibrateInterval) clearInterval(vibrateInterval);
-            try {
-                if (Platform.OS !== 'web') {
-                    Vibration.cancel();
-                }
-            } catch (err) {}
         };
     }, [unreadCount, showNotifSheet, activeTab]);
 
@@ -691,8 +553,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                         {/* Page Title */}
                         <Text style={styles.pageTitle}>Merchant Dashboard</Text>
 
-                        {/* Low Stock Warning Banner */}
-                        {stats.lowStockCount > 0 && (
+                        {/* Low Stock Warning Banner (Shown only after real data is loaded and low stock exists) */}
+                        {!isLoadingStats && stats && stats.lowStockCount > 0 && (
                             <TouchableOpacity
                                 style={styles.lowStockBanner}
                                 onPress={() => {
@@ -716,7 +578,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             </TouchableOpacity>
                         )}
 
-                        {/* 3 Metrics Overview Cards matching screenshot */}
+                        {/* 3 Metrics Overview Cards */}
                         <View style={styles.metricsRow}>
                             <TouchableOpacity
                                 style={styles.metricCard}
@@ -726,7 +588,11 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={styles.metricNum}>{stats.totalProducts}</Text>
+                                {isLoadingStats || !stats ? (
+                                    <ActivityIndicator size="small" color="#166534" style={{ marginVertical: 6 }} />
+                                ) : (
+                                    <Text style={styles.metricNum}>{stats.totalProducts ?? 0}</Text>
+                                )}
                                 <Text style={styles.metricLabel}>Total products</Text>
                             </TouchableOpacity>
 
@@ -737,7 +603,11 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={[styles.metricNum, styles.numAmber]}>{stats.lowStockCount}</Text>
+                                {isLoadingStats || !stats ? (
+                                    <ActivityIndicator size="small" color="#D97706" style={{ marginVertical: 6 }} />
+                                ) : (
+                                    <Text style={[styles.metricNum, styles.numAmber]}>{stats.lowStockCount ?? 0}</Text>
+                                )}
                                 <Text style={styles.metricLabel}>Low stock</Text>
                             </TouchableOpacity>
 
@@ -749,12 +619,16 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={[styles.metricNum, styles.numRed]}>{stats.outOfStockCount}</Text>
+                                {isLoadingStats || !stats ? (
+                                    <ActivityIndicator size="small" color="#DC2626" style={{ marginVertical: 6 }} />
+                                ) : (
+                                    <Text style={[styles.metricNum, styles.numRed]}>{stats.outOfStockCount ?? 0}</Text>
+                                )}
                                 <Text style={styles.metricLabel}>Out of stock</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Dual Status Cards: Soft Modern Pastel Theme matching React */}
+                        {/* Dual Status Cards: Soft Modern Pastel Theme */}
                         <View style={styles.dualGridRow}>
                             <TouchableOpacity
                                 style={styles.dualCardGreen}
@@ -767,7 +641,11 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <ShoppingBag size={14} color="#059669" />
                                     </View>
                                 </View>
-                                <Text style={styles.dualCountGreen}>{stats.activePickups ?? 6} Orders</Text>
+                                {isLoadingStats || !stats ? (
+                                    <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 6, alignSelf: 'flex-start' }} />
+                                ) : (
+                                    <Text style={styles.dualCountGreen}>{stats.activePickups ?? 0} Orders</Text>
+                                )}
                                 <Text style={styles.dualLinkGreen}>Ready for collection →</Text>
                             </TouchableOpacity>
 
@@ -784,7 +662,11 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <Truck size={14} color="#D97706" />
                                     </View>
                                 </View>
-                                <Text style={styles.dualCountAmber}>{stats.lowStockCount ?? 5} Items</Text>
+                                {isLoadingStats || !stats ? (
+                                    <ActivityIndicator size="small" color="#D97706" style={{ marginVertical: 6, alignSelf: 'flex-start' }} />
+                                ) : (
+                                    <Text style={styles.dualCountAmber}>{stats.lowStockCount ?? 0} Items</Text>
+                                )}
                                 <Text style={styles.dualLinkAmber}>Reorder from supplier →</Text>
                             </TouchableOpacity>
                         </View>
@@ -824,7 +706,11 @@ export default function ShopOwnerDashboard({ onNavigate }) {
 
                         {/* Store Offer Banner Management */}
                         <View style={styles.bannerSection}>
-                            <View style={styles.bannerHeaderLeft}>
+                            <TouchableOpacity
+                                style={styles.bannerHeaderLeft}
+                                onPress={handleOpenBannerModal}
+                                activeOpacity={0.7}
+                            >
                                 <View style={styles.bannerIconWrap}>
                                     <Tag size={16} color="#27672D" />
                                 </View>
@@ -834,9 +720,9 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         {hasCustomBanner ? '✓ Live on Customer App' : 'Not published yet'}
                                     </Text>
                                 </View>
-                            </View>
+                            </TouchableOpacity>
 
-                            {hasCustomBanner && (
+                            {hasCustomBanner ? (
                                 <View style={styles.bannerBtnsRow}>
                                     <TouchableOpacity
                                         style={styles.bannerEditBtn}
@@ -855,6 +741,15 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <Text style={styles.bannerDelBtnText}>Delete</Text>
                                     </TouchableOpacity>
                                 </View>
+                            ) : (
+                                <TouchableOpacity
+                                    style={styles.bannerEditBtn}
+                                    onPress={handleOpenBannerModal}
+                                    activeOpacity={0.8}
+                                >
+                                    <Plus size={13} color="#166534" />
+                                    <Text style={styles.bannerEditBtnText}>Setup Banner</Text>
+                                </TouchableOpacity>
                             )}
 
                             {hasCustomBanner && offerBanner ? (
@@ -963,6 +858,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             if (screen === 'inventory' || screen === 'product_list' || screen === 'back') {
                                 setSubScreen(null);
                                 setActiveTab('inventory');
+                                setSubPageParams(params || null);
                                 fetchDashboardStats();
                             } else {
                                 handleSubNavigate(screen, params);
@@ -984,6 +880,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             if (screen === 'inventory' || screen === 'product_list' || screen === 'back') {
                                 setSubScreen(null);
                                 setActiveTab('inventory');
+                                setSubPageParams(params || null);
                                 fetchDashboardStats();
                             } else {
                                 handleSubNavigate(screen, params);
@@ -1005,6 +902,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             if (screen === 'inventory' || screen === 'product_list' || screen === 'back') {
                                 setSubScreen(null);
                                 setActiveTab('inventory');
+                                setSubPageParams(params || null);
                                 fetchDashboardStats();
                             } else {
                                 handleSubNavigate(screen, params);
@@ -2167,9 +2065,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingVertical: 8,
-        paddingBottom: Platform.OS === 'android' ? 14 : 8,
-        height: Platform.OS === 'android' ? 68 : undefined,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'android' ? 24 : 8,
+        height: Platform.OS === 'android' ? 82 : undefined,
     },
     navItem: {
         flex: 1,
@@ -2199,8 +2097,8 @@ const styles = StyleSheet.create({
     modalCard: {
         backgroundColor: '#FFFFFF',
         width: '100%',
-        maxWidth: 335,
-        maxHeight: 520,
+        maxWidth: 345,
+        maxHeight: Platform.OS === 'web' ? 520 : '88%',
         borderRadius: 24,
         paddingHorizontal: 16,
         paddingTop: 16,

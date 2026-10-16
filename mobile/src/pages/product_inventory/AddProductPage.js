@@ -25,6 +25,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 
 const DEFAULT_RAW_CATEGORIES = [
     { name: 'Dairy', fallbackEmoji: '🥛', image: '' },
@@ -219,8 +220,13 @@ export default function AddProductPage({ onNavigate }) {
         reader.readAsDataURL(file);
     };
 
-    // Pick image via HTML input in web or base64
-    const handlePickImage = () => {
+    // Pick image via native ImagePicker on Mobile or HTML input in Web
+    const handlePickImage = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.7 });
+            if (uri) setImagePreview(uri);
+            return;
+        }
         if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';
@@ -237,7 +243,12 @@ export default function AddProductPage({ onNavigate }) {
         }
     };
 
-    const handlePickCatImage = () => {
+    const handlePickCatImage = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.7 });
+            if (uri) setNewCatImage(uri);
+            return;
+        }
         if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';

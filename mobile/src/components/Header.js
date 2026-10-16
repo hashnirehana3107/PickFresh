@@ -24,36 +24,12 @@ export default function Header({ roleTitle = 'Customer view', unreadCount = 0, o
             loopAnim = Animated.loop(shake);
             loopAnim.start();
 
-            const triggerVib = () => {
-                try {
-                    Vibration.vibrate([0, 300, 150, 300], false);
-                    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.vibrate) {
-                        navigator.vibrate([300, 150, 300]);
-                    }
-                } catch (e) {}
-            };
-            triggerVib();
-            vibInterval = setInterval(triggerVib, 2600);
-
             return () => {
                 if (loopAnim) loopAnim.stop();
                 bellShakeAnim.setValue(0);
-                if (vibInterval) clearInterval(vibInterval);
-                try {
-                    Vibration.cancel();
-                    if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.vibrate) {
-                        navigator.vibrate(0);
-                    }
-                } catch (e) {}
             };
         } else {
             bellShakeAnim.setValue(0);
-            try {
-                Vibration.cancel();
-                if (Platform.OS === 'web' && typeof navigator !== 'undefined' && navigator.vibrate) {
-                    navigator.vibrate(0);
-                }
-            } catch (e) {}
         }
     }, [unreadCount]);
 

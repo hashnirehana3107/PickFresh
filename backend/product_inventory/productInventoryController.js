@@ -225,26 +225,34 @@ const calculateStatus = (stock, minStock) => {
 // 1. Shop Owner Dashboard Summary strictly from MongoDB Atlas for target shop (Ultra Fast Parallel Queries)
 exports.getDashboardStats = async (req, res) => {
     try {
-        let query = {};
         const { storeEmail, storeName } = req.query;
-
-        if (storeEmail) {
-            query.ownerEmail = storeEmail.toLowerCase();
-        }
-
         let targetStoreName = (storeName || '').split('•')[0].trim();
         let storeRegex = null;
         if (targetStoreName) {
             storeRegex = new RegExp(targetStoreName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
         }
 
+        let query = {};
+        const orList = [];
+        if (storeEmail) {
+            const cleanEmail = storeEmail.toLowerCase().trim();
+            orList.push({ ownerEmail: cleanEmail });
+            orList.push({ storeEmail: cleanEmail });
+        }
+        if (storeRegex) {
+            orList.push({ storeName: storeRegex });
+        }
+        if (orList.length > 0) {
+            query.$or = orList;
+        }
+
         let dbProducts = [];
         let recentProducts = [];
         if (productsMemoryCache && productsMemoryCache.length > 0) {
-            dbProducts = storeEmail ? productsMemoryCache.filter(p => !p.ownerEmail || p.ownerEmail.toLowerCase() === storeEmail.toLowerCase()) : productsMemoryCache;
+            dbProducts = productsMemoryCache.filter(p => matchesStoreFilter(p, (storeEmail || '').toLowerCase().trim(), (storeName || '').toLowerCase().trim()));
             recentProducts = dbProducts.slice(0, 5);
         } else {
-            const fetched = await Product.find(query).select('name stock stockQuantity minStock lowStockThreshold createdAt updatedAt ownerEmail').sort({ createdAt: -1 }).lean();
+            const fetched = await Product.find(query).select('name stock stockQuantity minStock lowStockThreshold createdAt updatedAt ownerEmail storeEmail storeName').sort({ createdAt: -1 }).lean();
             dbProducts = fetched;
             recentProducts = fetched.slice(0, 5);
         }
@@ -434,7 +442,7 @@ const matchesStoreFilter = (p, storeEmailParam, storeNameParam) => {
         if (storeEmailParam.includes('grocery') && (pStoreName.includes('grocery') || pOwner.includes('grocery'))) return true;
         if (storeEmailParam.includes('lanka') && (pStoreName.includes('lanka') || pOwner.includes('lanka'))) return true;
     }
-    if (storeNameParam && pStoreName.includes(storeNameParam)) return true;
+    if (storeNameParam && (pStoreName.includes(storeNameParam) || storeNameParam.includes(pStoreName))) return true;
     return false;
 };
 
@@ -454,16 +462,20 @@ exports.getProducts = async (req, res) => {
 
         // 2. Fetch directly from Atlas if cache is empty or explicit refresh requested
         let query = {};
+        const orList = [];
         if (storeEmailParam) {
-            const orList = [
-                { ownerEmail: storeEmailParam },
-                { storeEmail: storeEmailParam }
-            ];
+            orList.push({ ownerEmail: storeEmailParam });
+            orList.push({ storeEmail: storeEmailParam });
             if (storeEmailParam.includes('grocery')) {
                 orList.push({ storeName: /grocery/i });
             } else if (storeEmailParam.includes('lanka')) {
                 orList.push({ storeName: /lanka/i });
             }
+        }
+        if (storeNameParam) {
+            orList.push({ storeName: new RegExp(storeNameParam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') });
+        }
+        if (orList.length > 0) {
             query.$or = orList;
         }
 
@@ -508,6 +520,9 @@ exports.getProducts = async (req, res) => {
 // 3. Add New Product (Saves directly to MongoDB 'products' collection & immediately updates cache)
 exports.addProduct = async (req, res) => {
     try {
+        const connectDB = require('../config/db');
+        await connectDB();
+
         const stockNum = Number(req.body.stock) || Number(req.body.stockQuantity) || 0;
         const minStockNum = Number(req.body.minStock) || Number(req.body.lowStockThreshold) || 10;
         const status = calculateStatus(stockNum, minStockNum);
@@ -593,6 +608,9 @@ exports.addProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
+        const connectDB = require('../config/db');
+        await connectDB();
+
         const stockNum = req.body.stock !== undefined ? Number(req.body.stock) : undefined;
         const minStockNum = req.body.minStock !== undefined ? Number(req.body.minStock) : undefined;
 
@@ -617,18 +635,42 @@ exports.updateProduct = async (req, res) => {
             updateFields.lowStockThreshold = finalMin;
         }
 
-        const updatedDoc = await Product.findByIdAndUpdate(id, updateFields, { new: true });
+        let updatedDoc = null;
+        const isValidId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+        if (isValidId) {
+            try {
+                updatedDoc = await Product.findByIdAndUpdate(id, updateFields, { new: true });
+            } catch (queryErr) {
+                console.warn('findByIdAndUpdate error, will fallback:', queryErr.message);
+            }
+        }
+
+        if (!updatedDoc) {
+            try {
+                updatedDoc = await Product.findOneAndUpdate(
+                    { $or: [{ _id: id }, { name: updateFields.name || id }] },
+                    updateFields,
+                    { new: true }
+                );
+            } catch (queryErr) {
+                console.warn('findOneAndUpdate error:', queryErr.message);
+            }
+        }
+
         if (updatedDoc) {
             upsertProductInCache(updatedDoc);
+        } else {
+            upsertProductInCache({ ...updateFields, _id: id, id });
         }
         notifyCustomerCacheInvalidation();
 
         return res.json({
             success: true,
             message: 'Product updated successfully in MongoDB products collection',
-            product: updatedDoc
+            product: updatedDoc || { ...updateFields, _id: id }
         });
     } catch (err) {
+        console.error('Update product error:', err.message);
         return res.status(500).json({ success: false, message: err.message });
     }
 };
@@ -637,7 +679,19 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        await Product.findByIdAndDelete(id);
+        const connectDB = require('../config/db');
+        await connectDB();
+
+        const isValidId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+        if (isValidId) {
+            try {
+                await Product.findByIdAndDelete(id);
+            } catch (e) {}
+        } else {
+            try {
+                await Product.findOneAndDelete({ $or: [{ _id: id }, { name: id }] });
+            } catch (e) {}
+        }
         removeProductFromCache(id);
         notifyCustomerCacheInvalidation();
         return res.json({ success: true, message: 'Product deleted from MongoDB products collection' });

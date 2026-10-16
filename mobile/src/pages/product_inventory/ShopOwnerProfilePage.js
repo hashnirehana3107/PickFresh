@@ -22,6 +22,7 @@ import {
     CheckCircle2,
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 
 export default function ShopOwnerProfilePage({ onNavigate, onBack }) {
     const { user, logout, updateUser, deactivateAccount } = useAuth();
@@ -70,8 +71,20 @@ export default function ShopOwnerProfilePage({ onNavigate, onBack }) {
         'Badulla', 'Nuwara Eliya', 'Hambantota', 'Ampara'
     ];
 
-    const handlePickImage = () => {
-        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const handlePickImage = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.6 });
+            if (uri) {
+                setProfileImage(uri);
+                if (updateUser) {
+                    await updateUser({ picture: uri });
+                }
+                setSaveToast('Store logo updated successfully!');
+                setTimeout(() => setSaveToast(''), 3000);
+            }
+            return;
+        }
+        if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';

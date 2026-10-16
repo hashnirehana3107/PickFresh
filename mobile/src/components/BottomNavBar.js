@@ -44,8 +44,9 @@ export default function BottomNavBar({ activeTab, onTabPress, cartCount = 0 }) {
 
 const styles = StyleSheet.create({
     navBar: {
-        height: Platform.OS === 'android' ? 76 : 65,
-        paddingBottom: Platform.OS === 'android' ? 12 : 0,
+        height: Platform.OS === 'android' ? 82 : 65,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'android' ? 24 : 0,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',

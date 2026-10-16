@@ -20,7 +20,25 @@ const connectDB = async (retries = 3) => {
     return mongoose.connection;
   }
 
-  // 2. If a connection attempt is already in flight, await it
+  // 2. If connection is already in progress, await it
+  if (mongoose.connection.readyState === 2) {
+    if (cached.promise) {
+      try {
+        await cached.promise;
+        if (mongoose.connection.readyState === 1) return mongoose.connection;
+      } catch (err) {
+        cached.promise = null;
+      }
+    }
+    try {
+      if (mongoose.connection.asPromise) {
+        await mongoose.connection.asPromise();
+        if (mongoose.connection.readyState === 1) return mongoose.connection;
+      }
+    } catch (err) {}
+  }
+
+  // 3. If a cached connection attempt is already in flight, await it
   if (cached.promise) {
     try {
       await cached.promise;
@@ -33,6 +51,7 @@ const connectDB = async (retries = 3) => {
   }
 
   mongoose.set('strictQuery', false);
+  mongoose.set('bufferTimeoutMS', 25000);
   const uri = process.env.MONGODB_URI || DEFAULT_ATLAS_URI;
 
   cached.promise = (async () => {

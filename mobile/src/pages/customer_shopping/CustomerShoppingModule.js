@@ -322,36 +322,12 @@ export default function CustomerShoppingModule({ initialPage = 'home', onNavigat
             const loopAnim = Animated.loop(shake);
             loopAnim.start();
 
-            const triggerVibration = () => {
-                try {
-                    if (Platform.OS !== 'web') {
-                        Vibration.vibrate([0, 300, 150, 300], false);
-                    }
-                } catch (err) {
-                    // Ignore
-                }
-            };
-
-            triggerVibration();
-            vibTimer = setInterval(triggerVibration, 2600);
-
             return () => {
                 loopAnim.stop();
                 bellShakeAnim.setValue(0);
-                if (vibTimer) clearInterval(vibTimer);
-                try {
-                    if (Platform.OS !== 'web') {
-                        Vibration.cancel();
-                    }
-                } catch (err) {}
             };
         } else {
             bellShakeAnim.setValue(0);
-            try {
-                if (Platform.OS !== 'web') {
-                    Vibration.cancel();
-                }
-            } catch (err) {}
         }
     }, [unreadCount]);
 
@@ -908,8 +884,9 @@ const styles = StyleSheet.create({
 
     // Fixed Bottom Navigation Bar Matching Web Prototype (4 Tabs)
     bottomNavBar: {
-        height: Platform.OS === 'android' ? 76 : 64,
-        paddingBottom: Platform.OS === 'android' ? 12 : 0,
+        height: Platform.OS === 'android' ? 82 : 64,
+        paddingTop: 8,
+        paddingBottom: Platform.OS === 'android' ? 24 : 0,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',

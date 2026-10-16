@@ -34,6 +34,7 @@ import { useAuth } from '../../context/AuthContext';
 import { CITIES_LIST } from '../../utils/cities';
 import { SUPPLY_CATEGORIES } from '../../utils/categories';
 import { API_BASE_URL } from '../../config/api';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 
 export default function SupplierProfileScreen({ onNavigate }) {
     const { user, logout, updateUser, deactivateAccount } = useAuth();
@@ -167,8 +168,30 @@ export default function SupplierProfileScreen({ onNavigate }) {
     }, []);
 
     // Change supplier profile picture
-    const handlePickImage = () => {
-        if (Platform.OS === 'web' && typeof document !== 'undefined') {
+    const handlePickImage = async () => {
+        if (Platform.OS !== 'web') {
+            const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.6 });
+            if (uri) {
+                setProfileImage(uri);
+                if (updateUser) {
+                    await updateUser({ picture: uri });
+                }
+                const reqEmail = email || user?.email;
+                if (reqEmail) {
+                    try {
+                        await fetch(`${API_BASE_URL}/auth/update-profile`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ email: reqEmail, picture: uri }),
+                        });
+                    } catch (e) {}
+                }
+                setSaveToast('Supplier logo updated successfully in database! 🚛');
+                setTimeout(() => setSaveToast(''), 3000);
+            }
+            return;
+        }
+        if (typeof document !== 'undefined') {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
@@ -181,15 +204,23 @@ export default function SupplierProfileScreen({ onNavigate }) {
                         if (updateUser) {
                             await updateUser({ picture: reader.result });
                         }
-                        setSaveToast('Supplier logo updated successfully in MongoDB Atlas! 🚛');
+                        const reqEmail = email || user?.email;
+                        if (reqEmail) {
+                            try {
+                                await fetch(`${API_BASE_URL}/auth/update-profile`, {
+                                    method: 'PUT',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ email: reqEmail, picture: reader.result }),
+                                });
+                            } catch (e) {}
+                        }
+                        setSaveToast('Supplier logo updated successfully in database! 🚛');
                         setTimeout(() => setSaveToast(''), 3000);
                     };
                     reader.readAsDataURL(file);
                 }
             };
             input.click();
-        } else {
-            Alert.alert('Change Logo', 'Logo update is supported via web file picker.');
         }
     };
 

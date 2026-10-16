@@ -159,44 +159,17 @@ export default function SupplierDashboard({ onNavigate: topNav, initialTab = 'ho
             loopAnim = Animated.loop(shake);
             loopAnim.start();
 
-            const triggerVibration = () => {
-                try {
-                    if (Platform.OS !== 'web') {
-                        Vibration.vibrate([0, 300, 150, 300], false);
-                    }
-                } catch (err) {}
-            };
-
-            triggerVibration();
-            vibrateInterval = setInterval(triggerVibration, 2600);
-
             return () => {
                 if (loopAnim) loopAnim.stop();
                 bellShakeAnim.setValue(0);
-                if (vibrateInterval) clearInterval(vibrateInterval);
-                try {
-                    if (Platform.OS !== 'web') {
-                        Vibration.cancel();
-                    }
-                } catch (err) {}
             };
         } else {
             if (loopAnim) loopAnim.stop();
             bellShakeAnim.setValue(0);
-            try {
-                if (Platform.OS !== 'web') {
-                    Vibration.cancel();
-                }
-            } catch (err) {}
         }
     }, [unreadCount, showNotifSheet, activeTab]);
 
     const handleBellClick = () => {
-        try {
-            if (Platform.OS !== 'web') {
-                Vibration.cancel();
-            }
-        } catch (e) {}
         setShowNotifSheet((prev) => !prev);
     };
 
@@ -931,8 +904,8 @@ const styles = StyleSheet.create({
         borderTopColor: '#E2E8F0',
         paddingHorizontal: 8,
         paddingTop: 8,
-        paddingBottom: Platform.OS === 'ios' ? 20 : (Platform.OS === 'android' ? 14 : 8),
-        height: Platform.OS === 'ios' ? 76 : (Platform.OS === 'android' ? 76 : 64),
+        paddingBottom: Platform.OS === 'ios' ? 20 : (Platform.OS === 'android' ? 24 : 8),
+        height: Platform.OS === 'ios' ? 76 : (Platform.OS === 'android' ? 82 : 64),
     },
     navItem: {
         alignItems: 'center',

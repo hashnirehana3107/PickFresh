@@ -34,6 +34,7 @@ import {
 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
+import { pickImageFromDevice } from '../../utils/imagePicker';
 
 const autoExtractBrand = (productName) => {
     if (!productName || typeof productName !== 'string') return '';
@@ -644,8 +645,15 @@ export default function SupplierCatalogScreen({ onNavigate }) {
                                     />
                                     <TouchableOpacity
                                         style={styles.uploadImgBtn}
-                                        onPress={() => {
-                                            if (Platform.OS === 'web' && typeof document !== 'undefined') {
+                                        onPress={async () => {
+                                            if (Platform.OS !== 'web') {
+                                                const uri = await pickImageFromDevice({ aspect: [1, 1], quality: 0.7 });
+                                                if (uri) {
+                                                    setFormData((prev) => ({ ...prev, image: uri }));
+                                                }
+                                                return;
+                                            }
+                                            if (typeof document !== 'undefined') {
                                                 const input = document.createElement('input');
                                                 input.type = 'file';
                                                 input.accept = 'image/*';
@@ -660,11 +668,6 @@ export default function SupplierCatalogScreen({ onNavigate }) {
                                                     }
                                                 };
                                                 input.click();
-                                            } else {
-                                                setFormData((prev) => ({
-                                                    ...prev,
-                                                    image: prev.image || 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=200&auto=format&fit=crop',
-                                                }));
                                             }
                                         }}
                                         activeOpacity={0.7}
