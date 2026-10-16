@@ -127,6 +127,22 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
                 const filtered = prev.filter((p) => String(p.id || p._id) !== idStr);
                 return [initialParams.newProduct, ...filtered];
             });
+            fetchProducts(true);
+        }
+        if (initialParams?.updatedProduct) {
+            setProducts((prev) => {
+                const idStr = String(initialParams.updatedProduct.id || initialParams.updatedProduct._id);
+                return prev.map((p) => (String(p.id || p._id) === idStr ? { ...p, ...initialParams.updatedProduct } : p));
+            });
+            fetchProducts(true);
+        }
+        if (initialParams?.deletedProductId) {
+            const delId = String(initialParams.deletedProductId);
+            setProducts((prev) => prev.filter((p) => String(p.id || p._id) !== delId));
+            fetchProducts(true);
+        }
+        if (initialParams?.refresh) {
+            fetchProducts(true);
         }
     }, [initialParams]);
 
@@ -143,19 +159,24 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
     };
 
     const handleConfirmDelete = async (productId) => {
+        const idStr = String(productId);
+        // Instant optimistic removal so user sees immediate live deletion!
+        setProducts((prev) => prev.filter((p) => String(p.id || p._id) !== idStr));
+        setDeletingProduct(null);
         try {
-            const res = await fetch(`${API_BASE_URL}/product-inventory/products/${productId}`, {
+            const res = await fetch(`${API_BASE_URL}/product-inventory/products/${idStr}`, {
                 method: 'DELETE',
             });
             const data = await res.json();
-            if (data.success) {
-                setProducts((prev) => prev.filter((p) => (p.id || p._id) !== productId));
-                setDeletingProduct(null);
-            } else {
+            if (!data.success) {
                 Alert.alert('Error', data.message || 'Failed to delete product.');
+                fetchProducts(true);
+            } else {
+                fetchProducts(true);
             }
         } catch (e) {
             Alert.alert('Error', 'Network error while deleting product.');
+            fetchProducts(true);
         }
     };
 

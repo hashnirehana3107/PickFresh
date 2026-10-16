@@ -39,7 +39,7 @@ export default function ProductInventoryModule({ initialPage = 'product_list', o
     return (
         <View style={styles.container}>
             {currentPage === 'product_list' && (
-                <ProductListPage onNavigate={handleNavigate} />
+                <ProductListPage onNavigate={handleNavigate} initialParams={subParams} />
             )}
 
             {currentPage === 'add_product' && (

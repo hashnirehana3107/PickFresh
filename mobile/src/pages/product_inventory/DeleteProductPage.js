@@ -16,8 +16,8 @@ export default function DeleteProductPage({ onNavigate, product }) {
 
     const handleDeletePermanently = async () => {
         setIsSubmitting(true);
+        const prodId = product?._id || product?.id;
         try {
-            const prodId = product?._id || product?.id;
             if (prodId) {
                 await fetch(`${API_BASE_URL}/product-inventory/products/${prodId}`, {
                     method: 'DELETE',
@@ -29,7 +29,7 @@ export default function DeleteProductPage({ onNavigate, product }) {
             setIsSubmitting(false);
             setIsDeleted(true);
             setTimeout(() => {
-                if (onNavigate) onNavigate('product_list');
+                if (onNavigate) onNavigate('product_list', { deletedProductId: prodId });
             }, 1000);
         }
     };

@@ -211,7 +211,8 @@ export default function EditProductPage({ onNavigate, product }) {
             if (res.ok && data.success) {
                 setBannerStatus('saved');
                 setTimeout(() => {
-                    if (onNavigate) onNavigate('product_list');
+                    const resolvedProduct = data.product || { ...initialProduct, ...updatedPayload, id: productIdToUpdate, _id: productIdToUpdate };
+                    if (onNavigate) onNavigate('product_list', { updatedProduct: resolvedProduct });
                 }, 1000);
             } else {
                 setErrorMsg(data.message || 'Failed to update product');
@@ -238,7 +239,7 @@ export default function EditProductPage({ onNavigate, product }) {
             if (res.ok && data.success) {
                 setBannerStatus('removed');
                 setTimeout(() => {
-                    if (onNavigate) onNavigate('product_list');
+                    if (onNavigate) onNavigate('product_list', { deletedProductId: productIdToDelete });
                 }, 1000);
             } else {
                 setErrorMsg(data.message || 'Failed to delete product');
