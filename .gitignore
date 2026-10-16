@@ -48,5 +48,7 @@ Thumbs.db
 # Temporary scripts and logs
 *.log
 backend/*.txt
+AGENTS.md
+*/AGENTS.md
 scratch/
 .system_generated/
