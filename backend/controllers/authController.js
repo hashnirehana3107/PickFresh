@@ -3,6 +3,7 @@ const Order = require('../models/Order');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 
 const generateToken = (user) => {
     return jwt.sign(
@@ -12,10 +13,10 @@ const generateToken = (user) => {
     );
 };
 
-// Helper: Query user strictly from MongoDB Atlas
+// Helper: Query user strictly from MongoDB Atlas (fast lean query excluding heavy offer banner)
 const findUserByEmail = async (email) => {
     if (!email) return null;
-    return await User.findOne({ email: email.toLowerCase() });
+    return await User.findOne({ email: email.toLowerCase() }).select('-offerBanner').lean();
 };
 
 // @desc Register new user strictly in MongoDB Atlas
@@ -43,6 +44,14 @@ exports.registerUser = async (req, res) => {
 
         if (!email || !password) {
             return res.status(400).json({ success: false, message: 'Please provide both email and password' });
+        }
+
+        if (mongoose.connection.readyState !== 1) {
+            try {
+                await connectDB();
+            } catch (connErr) {
+                console.error('DB connect retry failed on register:', connErr.message);
+            }
         }
 
         if (mongoose.connection.readyState !== 1) {
@@ -150,6 +159,14 @@ exports.loginUser = async (req, res) => {
         }
 
         if (mongoose.connection.readyState !== 1) {
+            try {
+                await connectDB();
+            } catch (connErr) {
+                console.error('DB connect retry failed on login:', connErr.message);
+            }
+        }
+
+        if (mongoose.connection.readyState !== 1) {
             return res.status(500).json({
                 success: false,
                 message: 'Database Connection Error: MongoDB Atlas is disconnected. Please check your network or IP whitelist.'
@@ -213,9 +230,14 @@ exports.loginUser = async (req, res) => {
 exports.getProfile = async (req, res) => {
     try {
         if (mongoose.connection.readyState !== 1) {
+            try {
+                await connectDB();
+            } catch (connErr) {}
+        }
+        if (mongoose.connection.readyState !== 1) {
             return res.status(500).json({ success: false, message: 'MongoDB Atlas Disconnected' });
         }
-        const user = await User.findById(req.user.id).select('-password');
+        const user = await User.findById(req.user.id).select('-password -offerBanner').lean();
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
         return res.json({ success: true, user });
     } catch (error) {
@@ -235,11 +257,10 @@ exports.socialLoginUser = async (req, res) => {
 
         const cleanEmail = email.toLowerCase().trim();
 
-        // Wait up to 3s if Mongoose is connecting or reconnecting
         if (mongoose.connection.readyState !== 1) {
-            for (let i = 0; i < 6 && mongoose.connection.readyState !== 1; i++) {
-                await new Promise(r => setTimeout(r, 500));
-            }
+            try {
+                await connectDB();
+            } catch (connErr) {}
         }
 
         if (mongoose.connection.readyState !== 1) {
@@ -327,7 +348,12 @@ exports.getUserDetails = async (req, res) => {
     try {
         const { email } = req.query;
         if (!email) return res.status(400).json({ success: false, message: 'Email required' });
-        const user = await User.findOne({ email: email.toLowerCase() }).select('-password').lean().exec();
+        if (mongoose.connection.readyState !== 1) {
+            try {
+                await connectDB();
+            } catch (connErr) {}
+        }
+        const user = await User.findOne({ email: email.toLowerCase() }).select('-password -offerBanner').lean().exec();
         if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
         return res.json({

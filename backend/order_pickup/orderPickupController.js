@@ -2,6 +2,7 @@ const OrderPickup = require('./OrderPickupModel');
 const StoreSchedule = require('./StoreScheduleModel');
 const Order = require('../models/Order');
 const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 
 // Default initial slots for seeding with explicit IDs
 const defaultSlotsByStore = {
@@ -45,6 +46,10 @@ const getStoreSlots = async (storeName) => {
 
     const matchedDefaultKey = findMatchingDefaultKey(rawKey);
     const key = matchedDefaultKey || rawKey;
+
+    if (mongoose.connection.readyState !== 1) {
+        try { await connectDB(); } catch (e) {}
+    }
 
     if (mongoose.connection.readyState === 1) {
         try {
@@ -109,6 +114,9 @@ const getStoreSlots = async (storeName) => {
 // Helper to save store slots to MongoDB Atlas
 const saveStoreSlots = async (key, slots) => {
     memorySlotsConfig[key] = slots;
+    if (mongoose.connection.readyState !== 1) {
+        try { await connectDB(); } catch (e) {}
+    }
     if (mongoose.connection.readyState === 1) {
         try {
             await StoreSchedule.findOneAndUpdate(
@@ -154,6 +162,9 @@ const matchSlotWithOrder = (orderSlotStr, slotTimeStr, slotDurationStr) => {
 // Helper to format schedule slots with live MongoDB orders
 const formatSlotsWithOrders = async (rawSlots, storeNameKey) => {
     let orders = [];
+    if (mongoose.connection.readyState !== 1) {
+        try { await connectDB(); } catch (e) {}
+    }
     if (mongoose.connection.readyState === 1) {
         try {
             let query = { status: { $ne: 'Cancelled' } };

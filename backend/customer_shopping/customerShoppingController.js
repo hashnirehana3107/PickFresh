@@ -2,6 +2,8 @@ const Product = require('../models/Product');
 const Order = require('../models/Order');
 const User = require('../models/User');
 const Category = require('../models/Category');
+const mongoose = require('mongoose');
+const connectDB = require('../config/db');
 
 let customerHomeCache = null;
 let customerHomeCacheTime = 0;
@@ -30,6 +32,10 @@ const getCategoryImageFallback = (catName = '', prodName = '') => {
 // 1. GET Customer Home Data (Featured products, active order status, stores, top categories)
 exports.getCustomerHome = async (req, res) => {
     try {
+        if (mongoose.connection.readyState !== 1) {
+            try { await connectDB(); } catch (e) {}
+        }
+
         const isFresh = customerHomeCache && (Date.now() - customerHomeCacheTime < CACHE_TTL);
 
         // If cache is fresh and not an authenticated user needing unique active pre-order, return immediately (0ms)

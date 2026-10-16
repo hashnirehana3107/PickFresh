@@ -73,11 +73,22 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const res = await fetch(`${API_BASE_URL}/auth/login`, {
+            let res = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email, password })
             });
+
+            // If a server error (500) occurs during a cold start or reconnect, retry once automatically
+            if (res.status >= 500) {
+                await new Promise(r => setTimeout(r, 1200));
+                res = await fetch(`${API_BASE_URL}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+            }
+
             const data = await res.json();
 
             if (!res.ok || !data.success) {
@@ -106,11 +117,22 @@ export const AuthProvider = ({ children }) => {
         }
 
         try {
-            const res = await fetch(`${API_BASE_URL}/auth/register`, {
+            let res = await fetch(`${API_BASE_URL}/auth/register`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(userData)
             });
+
+            // If a server error (500) occurs during a cold start or reconnect, retry once automatically
+            if (res.status >= 500) {
+                await new Promise(r => setTimeout(r, 1200));
+                res = await fetch(`${API_BASE_URL}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(userData)
+                });
+            }
+
             const data = await res.json();
 
             if (!res.ok || !data.success) {
