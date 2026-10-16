@@ -1,14 +1,8 @@
 import { Platform } from 'react-native';
 
-// In React Native:
-// Android Emulator uses 10.0.2.2 or current host IP
-// Physical device over local Wi-Fi uses your computer's Wi-Fi IP (192.168.1.100)
-// Web uses localhost
-export const API_HOST = Platform.select({
-    android: 'http://192.168.1.100:5000',
-    ios: 'http://192.168.1.100:5000',
-    default: 'http://localhost:5000',
-});
+// Live Cloud Backend (Vercel Serverless connected to MongoDB Atlas)
+// Works globally 24/7 on any device (Android, iOS, Web) via Wi-Fi or Mobile Data (4G/5G)
+export const API_HOST = 'https://pick-fresh.vercel.app';
 
 export const getApiBaseUrl = () => API_HOST;
 
