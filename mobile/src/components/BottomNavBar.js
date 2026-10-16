@@ -44,22 +44,23 @@ export default function BottomNavBar({ activeTab, onTabPress, cartCount = 0 }) {
 
 const styles = StyleSheet.create({
     navBar: {
-        height: Platform.OS === 'android' ? 82 : 65,
+        height: Platform.OS === 'android' ? 96 : 65,
         paddingTop: 8,
-        paddingBottom: Platform.OS === 'android' ? 24 : 0,
+        paddingBottom: Platform.OS === 'android' ? 44 : 0,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: Platform.OS === 'android' ? 'flex-start' : 'center',
         justifyContent: 'space-around',
         paddingHorizontal: 12,
     },
     tabBtn: {
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         flex: 1,
-        paddingVertical: 6,
+        paddingTop: Platform.OS === 'android' ? 2 : 6,
+        paddingBottom: 6,
     },
     iconWrap: {
         position: 'relative',

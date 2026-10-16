@@ -222,11 +222,28 @@ const calculateStatus = (stock, minStock) => {
     return 'IN STOCK';
 };
 
+// RAM memory cache for instant (1ms) Dashboard responses
+let dashboardMemoryCache = {};
+let dashboardMemoryCacheTime = {};
+
+const invalidateDashboardCache = () => {
+    dashboardMemoryCache = {};
+    dashboardMemoryCacheTime = {};
+};
+exports.invalidateDashboardCache = invalidateDashboardCache;
+
 // 1. Shop Owner Dashboard Summary strictly from MongoDB Atlas for target shop (Ultra Fast Parallel Queries)
 exports.getDashboardStats = async (req, res) => {
     try {
         const storeEmailParam = (req.query.storeEmail || req.query.email || '').toLowerCase().trim();
         const storeNameParam = (req.query.storeName || '').trim();
+        const explicitRefresh = req.query.refresh === 'true';
+        const cacheKey = `${storeEmailParam}_${storeNameParam}`;
+
+        // Return from synchronized RAM cache instantly (1ms) if fresh (TTL 30s)
+        if (!explicitRefresh && dashboardMemoryCache[cacheKey] && (Date.now() - (dashboardMemoryCacheTime[cacheKey] || 0) < 30000)) {
+            return res.json(dashboardMemoryCache[cacheKey]);
+        }
 
         let query = {};
         const orList = [];
@@ -327,7 +344,7 @@ exports.getDashboardStats = async (req, res) => {
             };
         });
 
-        return res.json({
+        const responseData = {
             success: true,
             stats: {
                 totalProducts,
@@ -342,7 +359,12 @@ exports.getDashboardStats = async (req, res) => {
                 return stk <= minStk;
             }),
             recentActivity
-        });
+        };
+
+        dashboardMemoryCache[cacheKey] = responseData;
+        dashboardMemoryCacheTime[cacheKey] = Date.now();
+
+        return res.json(responseData);
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }
@@ -380,6 +402,7 @@ const removeProductFromCache = (productId) => {
 const invalidateProductsCache = () => {
     productsMemoryCache = null;
     productsMemoryCacheTime = 0;
+    invalidateDashboardCache();
     prewarmProductsCache().catch(() => {});
 };
 exports.invalidateProductsCache = invalidateProductsCache;
@@ -481,8 +504,8 @@ exports.getProducts = async (req, res) => {
         const storeNameParam = (req.query.storeName || '').toLowerCase().trim();
         const explicitRefresh = req.query.refresh === 'true';
 
-        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 3s)
-        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 3000)) {
+        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 60s)
+        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 60000)) {
             const filtered = productsMemoryCache.filter(p => matchesStoreFilter(p, storeEmailParam, storeNameParam));
             return res.json({ success: true, count: filtered.length, products: filtered });
         }
@@ -618,6 +641,7 @@ exports.addProduct = async (req, res) => {
         const savedProduct = await Product.create(newProductData);
         // Immediate in-memory cache update so the very next getProducts is 0ms
         const formatted = upsertProductInCache(savedProduct);
+        invalidateDashboardCache();
         notifyCustomerCacheInvalidation();
 
         return res.status(201).json({
@@ -664,6 +688,7 @@ exports.updateProduct = async (req, res) => {
         if (updatedDoc) {
             formatted = upsertProductInCache(updatedDoc);
         }
+        invalidateDashboardCache();
         notifyCustomerCacheInvalidation();
 
         return res.json({
@@ -682,6 +707,7 @@ exports.deleteProduct = async (req, res) => {
         const { id } = req.params;
         await Product.findByIdAndDelete(id);
         removeProductFromCache(id);
+        invalidateDashboardCache();
         notifyCustomerCacheInvalidation();
         return res.json({ success: true, message: 'Product deleted from MongoDB products collection', deletedId: id });
     } catch (err) {

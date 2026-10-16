@@ -98,111 +98,20 @@ export default function ShopOwnerDashboard({ onNavigate }) {
         }
     };
 
-    // Dynamic Stats State strictly from MongoDB Atlas Backend
-    const [stats, setStats] = useState({
-        totalProducts: 22,
-        lowStockCount: 5,
-        outOfStockCount: 1,
+    // Dynamic Stats State strictly from MongoDB Atlas Backend (NO hardcoded fake numbers)
+    const [stats, setStats] = useState(shopOwnerDashboardCache?.stats || {
+        totalProducts: null,
+        lowStockCount: null,
+        outOfStockCount: null,
         todaySales: 0,
-        activePickups: 6,
+        activePickups: null,
     });
 
-    const [recentActivity, setRecentActivity] = useState([]);
+    const [recentActivity, setRecentActivity] = useState(shopOwnerDashboardCache?.recentActivity || []);
     const [isLoadingStats, setIsLoadingStats] = useState(false);
 
     // Shop Owner Specific Notifications Data strictly from MongoDB Atlas Backend
-    const [notifications, setNotifications] = useState(shopOwnerDashboardCache?.notifications || [
-        {
-            id: 'ord_6acf39c1483aef103782f004',
-            title: 'New Customer Pre-Order #PF-F004',
-            message: 'Kiara Fernando placed a pickup order (2 items • Rs. 700).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6acf35b5483aef103782eb62',
-            title: 'New Customer Pre-Order #PF-EB62',
-            message: 'Kiara Fernando placed a pickup order (1 item • Rs. 650).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6acf3572483aef103782eb11',
-            title: 'New Customer Pre-Order #PF-EB11',
-            message: 'Guest Customer placed a pickup order (1 item • Rs. 300).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6acf354e483aef103782eaec',
-            title: 'New Customer Pre-Order #PF-EAEC',
-            message: 'Guest Customer placed a pickup order (1 item • Rs. 650).',
-            time: '11h ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'ord_6accf8d293f8284dc3c15b21',
-            title: 'New Customer Pre-Order #PF-5B21',
-            message: 'achala placed a pickup order (1 item • Rs. 660).',
-            time: '2d ago',
-            type: 'order',
-            targetTab: 'orders',
-            read: false,
-        },
-        {
-            id: 'sup_6aca99a78ca7a309ae4fc919',
-            title: 'Supplier Delivery Pending Approval',
-            message: 'Lanka Mega Wholesale Distributors shipment #PO-0003 status is Pending Approval.',
-            time: '3d ago',
-            type: 'supplier',
-            targetTab: 'suppliers',
-            read: false,
-        },
-        {
-            id: 'sup_6ac97d554e3dad798e73ec07',
-            title: 'Supplier Delivery Delivered',
-            message: 'Central Food City shipment #PO-0002 status is Delivered.',
-            time: '4d ago',
-            type: 'supplier',
-            targetTab: 'suppliers',
-            read: false,
-        },
-        {
-            id: 'stk_6ac67f0971f7f3cd1a3104f1',
-            title: 'Critical Low Stock Warning',
-            message: 'Coca Cola Pet Bottle 1.05L is down to 1 bottle in stock. Reorder recommended.',
-            time: '7d ago',
-            type: 'stock',
-            targetTab: 'inventory',
-            read: false,
-        },
-        {
-            id: 'stk_6ac67d7b71f7f3cd1a310262',
-            title: 'Critical Low Stock Warning',
-            message: 'Ratthi Full Cream Milk Powder - 400g is down to 0 pack in stock. Reorder recommended.',
-            time: '7d ago',
-            type: 'stock',
-            targetTab: 'inventory',
-            read: false,
-        },
-        {
-            id: 'stk_6ac67af771f7f3cd1a30fe23',
-            title: 'Critical Low Stock Warning',
-            message: 'Bitter Gourd is down to 3 1kg in stock. Reorder recommended.',
-            time: '7d ago',
-            type: 'stock',
-            targetTab: 'inventory',
-            read: false,
-        },
-    ]);
+    const [notifications, setNotifications] = useState(shopOwnerDashboardCache?.notifications || []);
     const unreadCount = notifications.filter((n) => !n.read).length;
     const bellShakeAnim = useRef(new Animated.Value(0)).current;
 
@@ -281,7 +190,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             const res = await fetch(
                 `${API_BASE_URL}/product-inventory/dashboard?storeEmail=${encodeURIComponent(
                     storeEmail
-                )}&storeName=${encodeURIComponent(storeTitle)}&_t=${Date.now()}`
+                )}&storeName=${encodeURIComponent(storeTitle)}`
             );
             const data = await res.json();
             if (data.success && data.stats) {
@@ -289,6 +198,18 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                     ...prev,
                     ...data.stats,
                 }));
+                shopOwnerDashboardCache = {
+                    ...(shopOwnerDashboardCache || {}),
+                    stats: data.stats,
+                    recentActivity: data.recentActivity || [],
+                };
+                try {
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    AsyncStorage.setItem('@pickfresh_shopowner_cache', JSON.stringify({
+                        stats: data.stats,
+                        recentActivity: data.recentActivity || [],
+                    })).catch(() => {});
+                } catch (e) {}
             }
             if (data.success && Array.isArray(data.recentActivity)) {
                 setRecentActivity(data.recentActivity);
@@ -426,6 +347,27 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             bellShakeAnim.setValue(0);
         };
     }, [unreadCount, showNotifSheet, activeTab]);
+
+    // Instantly hydrate cached real dashboard numbers on startup (0ms)
+    useEffect(() => {
+        let isMounted = true;
+        (async () => {
+            try {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                const cachedRaw = await AsyncStorage.getItem('@pickfresh_shopowner_cache');
+                if (cachedRaw && isMounted) {
+                    const parsed = JSON.parse(cachedRaw);
+                    if (parsed?.stats) {
+                        setStats((prev) => ({ ...prev, ...parsed.stats }));
+                    }
+                    if (Array.isArray(parsed?.recentActivity) && parsed.recentActivity.length > 0) {
+                        setRecentActivity(parsed.recentActivity);
+                    }
+                }
+            } catch (e) {}
+        })();
+        return () => { isMounted = false; };
+    }, []);
 
     useEffect(() => {
         fetchDashboardData();
@@ -687,7 +629,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={styles.metricNum}>{stats.totalProducts}</Text>
+                                <Text style={styles.metricNum}>{stats.totalProducts !== null ? stats.totalProducts : '-'}</Text>
                                 <Text style={styles.metricLabel}>Total products</Text>
                             </TouchableOpacity>
 
@@ -698,7 +640,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={[styles.metricNum, styles.numAmber]}>{stats.lowStockCount}</Text>
+                                <Text style={[styles.metricNum, styles.numAmber]}>{stats.lowStockCount !== null ? stats.lowStockCount : '-'}</Text>
                                 <Text style={styles.metricLabel}>Low stock</Text>
                             </TouchableOpacity>
 
@@ -710,7 +652,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                <Text style={[styles.metricNum, styles.numRed]}>{stats.outOfStockCount}</Text>
+                                <Text style={[styles.metricNum, styles.numRed]}>{stats.outOfStockCount !== null ? stats.outOfStockCount : '-'}</Text>
                                 <Text style={styles.metricLabel}>Out of stock</Text>
                             </TouchableOpacity>
                         </View>
@@ -728,7 +670,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <ShoppingBag size={14} color="#059669" />
                                     </View>
                                 </View>
-                                <Text style={styles.dualCountGreen}>{stats.activePickups ?? 6} Orders</Text>
+                                <Text style={styles.dualCountGreen}>{stats.activePickups !== null ? `${stats.activePickups} Orders` : '0 Orders'}</Text>
                                 <Text style={styles.dualLinkGreen}>Ready for collection →</Text>
                             </TouchableOpacity>
 
@@ -745,7 +687,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <Truck size={14} color="#D97706" />
                                     </View>
                                 </View>
-                                <Text style={styles.dualCountAmber}>{stats.lowStockCount ?? 5} Items</Text>
+                                <Text style={styles.dualCountAmber}>{stats.lowStockCount !== null ? `${stats.lowStockCount} Items` : '0 Items'}</Text>
                                 <Text style={styles.dualLinkAmber}>Reorder from supplier →</Text>
                             </TouchableOpacity>
                         </View>
@@ -1612,7 +1554,7 @@ const styles = StyleSheet.create({
     contentScrollInner: {
         paddingHorizontal: 18,
         paddingTop: 18,
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 60 : 24,
     },
     welcomeCard: {
         backgroundColor: '#F0FDF4',
@@ -2156,17 +2098,18 @@ const styles = StyleSheet.create({
         borderTopColor: '#E2E8F0',
         flexDirection: 'row',
         justifyContent: 'space-around',
-        alignItems: 'center',
+        alignItems: Platform.OS === 'android' ? 'flex-start' : 'center',
         paddingTop: 8,
-        paddingBottom: Platform.OS === 'android' ? 24 : 8,
-        height: Platform.OS === 'android' ? 82 : undefined,
+        paddingBottom: Platform.OS === 'android' ? 44 : 8,
+        height: Platform.OS === 'android' ? 96 : undefined,
     },
     navItem: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         gap: 3,
-        paddingVertical: 4,
+        paddingTop: Platform.OS === 'android' ? 2 : 4,
+        paddingBottom: 4,
     },
     navText: {
         fontSize: 11,
@@ -2189,8 +2132,9 @@ const styles = StyleSheet.create({
     modalCard: {
         backgroundColor: '#FFFFFF',
         width: '100%',
-        maxWidth: 345,
-        maxHeight: Platform.OS === 'web' ? 520 : '88%',
+        maxWidth: 355,
+        height: Platform.OS === 'web' ? 520 : '82%',
+        maxHeight: 620,
         borderRadius: 24,
         paddingHorizontal: 16,
         paddingTop: 16,
@@ -2202,7 +2146,6 @@ const styles = StyleSheet.create({
         elevation: 12,
         borderWidth: 1,
         borderColor: '#F1F5F9',
-        display: 'flex',
         flexDirection: 'column',
     },
     confirmModalOverlay: {
@@ -2285,9 +2228,8 @@ const styles = StyleSheet.create({
     },
     modalScrollView: {
         flex: 1,
-        flexGrow: 1,
-        flexShrink: 1,
-        maxHeight: 380,
+        width: '100%',
+        minHeight: 320,
     },
     modalHeaderRow: {
         flexDirection: 'row',
@@ -2310,7 +2252,7 @@ const styles = StyleSheet.create({
     },
     modalScrollContent: {
         gap: 10,
-        paddingBottom: 8,
+        paddingBottom: 16,
     },
     formGroup: {
         gap: 4,

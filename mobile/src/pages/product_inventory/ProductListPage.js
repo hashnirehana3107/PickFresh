@@ -77,16 +77,20 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
     const storeTitle = user?.shopName || user?.storeName || user?.name || 'GroceryMart';
 
     const fetchProducts = async (isManual = false) => {
-        if (!user?.email) return;
         try {
+            const email = user?.email || 'grocerymart@gmail.com';
             const refreshParam = isManual ? '&refresh=true' : '';
             const endpoint = `${API_BASE_URL}/product-inventory/products?storeEmail=${encodeURIComponent(
-                user.email
-            )}&storeName=${encodeURIComponent(storeTitle)}${refreshParam}&_t=${Date.now()}`;
+                email
+            )}&storeName=${encodeURIComponent(storeTitle)}${refreshParam}`;
             const res = await fetch(endpoint);
             const data = await res.json();
             if (data.success && Array.isArray(data.products)) {
                 setProducts(data.products);
+                try {
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(data.products)).catch(() => {});
+                } catch (e) {}
             }
         } catch (err) {
             console.warn('Failed to fetch products:', err);
@@ -108,6 +112,25 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
             }
         } catch (err) {}
     };
+
+    // Instantly hydrate cached real products on startup (0ms)
+    useEffect(() => {
+        let isMounted = true;
+        (async () => {
+            try {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                const cachedRaw = await AsyncStorage.getItem('@pickfresh_products_cache');
+                if (cachedRaw && isMounted) {
+                    const parsed = JSON.parse(cachedRaw);
+                    if (Array.isArray(parsed) && parsed.length > 0) {
+                        setProducts((prev) => (prev.length === 0 ? parsed : prev));
+                        setIsLoading(false);
+                    }
+                }
+            } catch (e) {}
+        })();
+        return () => { isMounted = false; };
+    }, []);
 
     useEffect(() => {
         fetchProducts();

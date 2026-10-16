@@ -884,15 +884,15 @@ const styles = StyleSheet.create({
 
     // Fixed Bottom Navigation Bar Matching Web Prototype (4 Tabs)
     bottomNavBar: {
-        height: Platform.OS === 'android' ? 82 : 64,
+        height: Platform.OS === 'android' ? 96 : 64,
         paddingTop: 8,
-        paddingBottom: Platform.OS === 'android' ? 24 : 0,
+        paddingBottom: Platform.OS === 'android' ? 44 : 0,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',
         flexDirection: 'row',
         justifyContent: 'space-around',
-        alignItems: 'center',
+        alignItems: Platform.OS === 'android' ? 'flex-start' : 'center',
         shadowColor: '#000000',
         shadowOffset: { width: 0, height: -4 },
         shadowOpacity: 0.04,
@@ -903,9 +903,10 @@ const styles = StyleSheet.create({
     navTabBtn: {
         flex: 1,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-start',
         gap: 3,
-        paddingVertical: 6,
+        paddingTop: Platform.OS === 'android' ? 2 : 6,
+        paddingBottom: 6,
     },
     navTabLabel: {
         fontSize: 11,

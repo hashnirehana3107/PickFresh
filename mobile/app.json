@@ -16,9 +16,12 @@
     "android": {
       "package": "com.pickfresh.mobile",
       "permissions": [
-        "INTERNET",
-        "VIBRATE"
+        "INTERNET"
       ],
+      "androidNavigationBar": {
+        "barStyle": "dark-content",
+        "backgroundColor": "#FFFFFF"
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
