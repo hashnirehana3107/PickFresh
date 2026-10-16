@@ -211,9 +211,13 @@ export default function EditProductPage({ onNavigate, product }) {
             if (res.ok && data.success) {
                 setBannerStatus('saved');
                 setTimeout(() => {
-                    const resolvedProduct = data.product || { ...initialProduct, ...updatedPayload, id: productIdToUpdate, _id: productIdToUpdate };
-                    if (onNavigate) onNavigate('product_list', { updatedProduct: resolvedProduct });
-                }, 1000);
+                    if (onNavigate) {
+                        onNavigate('product_list', {
+                            updatedProduct: data.product || { ...updatedPayload, id: productIdToUpdate, _id: productIdToUpdate },
+                            refresh: true
+                        });
+                    }
+                }, 400);
             } else {
                 setErrorMsg(data.message || 'Failed to update product');
             }
@@ -239,8 +243,10 @@ export default function EditProductPage({ onNavigate, product }) {
             if (res.ok && data.success) {
                 setBannerStatus('removed');
                 setTimeout(() => {
-                    if (onNavigate) onNavigate('product_list', { deletedProductId: productIdToDelete });
-                }, 1000);
+                    if (onNavigate) {
+                        onNavigate('product_list', { deletedProductId: productIdToDelete, refresh: true });
+                    }
+                }, 400);
             } else {
                 setErrorMsg(data.message || 'Failed to delete product');
             }

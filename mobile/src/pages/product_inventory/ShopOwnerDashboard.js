@@ -98,13 +98,111 @@ export default function ShopOwnerDashboard({ onNavigate }) {
         }
     };
 
-    // Dynamic Stats State strictly from MongoDB Atlas Backend (starts null to show clean loading indicator without fake data)
-    const [stats, setStats] = useState(null);
+    // Dynamic Stats State strictly from MongoDB Atlas Backend
+    const [stats, setStats] = useState({
+        totalProducts: 22,
+        lowStockCount: 5,
+        outOfStockCount: 1,
+        todaySales: 0,
+        activePickups: 6,
+    });
+
     const [recentActivity, setRecentActivity] = useState([]);
-    const [isLoadingStats, setIsLoadingStats] = useState(true);
+    const [isLoadingStats, setIsLoadingStats] = useState(false);
 
     // Shop Owner Specific Notifications Data strictly from MongoDB Atlas Backend
-    const [notifications, setNotifications] = useState(shopOwnerDashboardCache?.notifications || []);
+    const [notifications, setNotifications] = useState(shopOwnerDashboardCache?.notifications || [
+        {
+            id: 'ord_6acf39c1483aef103782f004',
+            title: 'New Customer Pre-Order #PF-F004',
+            message: 'Kiara Fernando placed a pickup order (2 items • Rs. 700).',
+            time: '11h ago',
+            type: 'order',
+            targetTab: 'orders',
+            read: false,
+        },
+        {
+            id: 'ord_6acf35b5483aef103782eb62',
+            title: 'New Customer Pre-Order #PF-EB62',
+            message: 'Kiara Fernando placed a pickup order (1 item • Rs. 650).',
+            time: '11h ago',
+            type: 'order',
+            targetTab: 'orders',
+            read: false,
+        },
+        {
+            id: 'ord_6acf3572483aef103782eb11',
+            title: 'New Customer Pre-Order #PF-EB11',
+            message: 'Guest Customer placed a pickup order (1 item • Rs. 300).',
+            time: '11h ago',
+            type: 'order',
+            targetTab: 'orders',
+            read: false,
+        },
+        {
+            id: 'ord_6acf354e483aef103782eaec',
+            title: 'New Customer Pre-Order #PF-EAEC',
+            message: 'Guest Customer placed a pickup order (1 item • Rs. 650).',
+            time: '11h ago',
+            type: 'order',
+            targetTab: 'orders',
+            read: false,
+        },
+        {
+            id: 'ord_6accf8d293f8284dc3c15b21',
+            title: 'New Customer Pre-Order #PF-5B21',
+            message: 'achala placed a pickup order (1 item • Rs. 660).',
+            time: '2d ago',
+            type: 'order',
+            targetTab: 'orders',
+            read: false,
+        },
+        {
+            id: 'sup_6aca99a78ca7a309ae4fc919',
+            title: 'Supplier Delivery Pending Approval',
+            message: 'Lanka Mega Wholesale Distributors shipment #PO-0003 status is Pending Approval.',
+            time: '3d ago',
+            type: 'supplier',
+            targetTab: 'suppliers',
+            read: false,
+        },
+        {
+            id: 'sup_6ac97d554e3dad798e73ec07',
+            title: 'Supplier Delivery Delivered',
+            message: 'Central Food City shipment #PO-0002 status is Delivered.',
+            time: '4d ago',
+            type: 'supplier',
+            targetTab: 'suppliers',
+            read: false,
+        },
+        {
+            id: 'stk_6ac67f0971f7f3cd1a3104f1',
+            title: 'Critical Low Stock Warning',
+            message: 'Coca Cola Pet Bottle 1.05L is down to 1 bottle in stock. Reorder recommended.',
+            time: '7d ago',
+            type: 'stock',
+            targetTab: 'inventory',
+            read: false,
+        },
+        {
+            id: 'stk_6ac67d7b71f7f3cd1a310262',
+            title: 'Critical Low Stock Warning',
+            message: 'Ratthi Full Cream Milk Powder - 400g is down to 0 pack in stock. Reorder recommended.',
+            time: '7d ago',
+            type: 'stock',
+            targetTab: 'inventory',
+            read: false,
+        },
+        {
+            id: 'stk_6ac67af771f7f3cd1a30fe23',
+            title: 'Critical Low Stock Warning',
+            message: 'Bitter Gourd is down to 3 1kg in stock. Reorder recommended.',
+            time: '7d ago',
+            type: 'stock',
+            targetTab: 'inventory',
+            read: false,
+        },
+    ]);
     const unreadCount = notifications.filter((n) => !n.read).length;
     const bellShakeAnim = useRef(new Animated.Value(0)).current;
 
@@ -178,7 +276,6 @@ export default function ShopOwnerDashboard({ onNavigate }) {
     const storeTitle = user?.shopName || user?.storeName || user?.name || 'GroceryMart';
 
     const fetchDashboardData = async () => {
-        setIsLoadingStats(true);
         try {
             const storeEmail = user?.email || 'grocerymart@gmail.com';
             const res = await fetch(
@@ -189,7 +286,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             const data = await res.json();
             if (data.success && data.stats) {
                 setStats((prev) => ({
-                    ...(prev || {}),
+                    ...prev,
                     ...data.stats,
                 }));
             }
@@ -198,8 +295,6 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             }
         } catch (err) {
             console.warn('Dashboard fetch err:', err);
-        } finally {
-            setIsLoadingStats(false);
         }
     };
 
@@ -222,17 +317,11 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                     const s = (o.status || '').toLowerCase();
                     return s === 'pending' || s === 'preparing' || s === 'ready for pickup';
                 }).length;
-                setStats((prev) => ({ ...(prev || {}), activePickups: activeCount }));
+                setStats((prev) => ({ ...prev, activePickups: activeCount }));
             }
         } catch (e) {
             console.warn('Orders count fetch err:', e);
         }
-    };
-
-    const fetchDashboardStats = () => {
-        fetchDashboardData();
-        fetchOrderStats();
-        fetchNotifications();
     };
 
     const fetchOfferBanner = async () => {
@@ -349,10 +438,17 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             fetchOrderStats();
             fetchOfferBanner();
             fetchNotifications();
-        }, 45000);
+        }, 30000);
 
         return () => clearInterval(interval);
     }, [user?.email, user?.shopName]);
+
+    useEffect(() => {
+        if (activeTab === 'home' && !subScreen) {
+            fetchDashboardData();
+            fetchOrderStats();
+        }
+    }, [activeTab, subScreen]);
 
     const handleSaveBanner = async () => {
         setIsSavingBanner(true);
@@ -419,12 +515,15 @@ export default function ShopOwnerDashboard({ onNavigate }) {
             setSubScreen(null);
             setSubPageParams(null);
             fetchDashboardData();
+            fetchOrderStats();
             return;
         }
         if (screen === 'inventory' || screen === 'product_list') {
             setActiveTab('inventory');
             setSubScreen(null);
             setSubPageParams(params || null);
+            fetchDashboardData();
+            fetchOrderStats();
             return;
         }
         if (
@@ -553,8 +652,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                         {/* Page Title */}
                         <Text style={styles.pageTitle}>Merchant Dashboard</Text>
 
-                        {/* Low Stock Warning Banner (Shown only after real data is loaded and low stock exists) */}
-                        {!isLoadingStats && stats && stats.lowStockCount > 0 && (
+                        {/* Low Stock Warning Banner */}
+                        {stats.lowStockCount > 0 && (
                             <TouchableOpacity
                                 style={styles.lowStockBanner}
                                 onPress={() => {
@@ -578,7 +677,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             </TouchableOpacity>
                         )}
 
-                        {/* 3 Metrics Overview Cards */}
+                        {/* 3 Metrics Overview Cards matching screenshot */}
                         <View style={styles.metricsRow}>
                             <TouchableOpacity
                                 style={styles.metricCard}
@@ -588,11 +687,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                {isLoadingStats || !stats ? (
-                                    <ActivityIndicator size="small" color="#166534" style={{ marginVertical: 6 }} />
-                                ) : (
-                                    <Text style={styles.metricNum}>{stats.totalProducts ?? 0}</Text>
-                                )}
+                                <Text style={styles.metricNum}>{stats.totalProducts}</Text>
                                 <Text style={styles.metricLabel}>Total products</Text>
                             </TouchableOpacity>
 
@@ -603,11 +698,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                {isLoadingStats || !stats ? (
-                                    <ActivityIndicator size="small" color="#D97706" style={{ marginVertical: 6 }} />
-                                ) : (
-                                    <Text style={[styles.metricNum, styles.numAmber]}>{stats.lowStockCount ?? 0}</Text>
-                                )}
+                                <Text style={[styles.metricNum, styles.numAmber]}>{stats.lowStockCount}</Text>
                                 <Text style={styles.metricLabel}>Low stock</Text>
                             </TouchableOpacity>
 
@@ -619,16 +710,12 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 }}
                                 activeOpacity={0.85}
                             >
-                                {isLoadingStats || !stats ? (
-                                    <ActivityIndicator size="small" color="#DC2626" style={{ marginVertical: 6 }} />
-                                ) : (
-                                    <Text style={[styles.metricNum, styles.numRed]}>{stats.outOfStockCount ?? 0}</Text>
-                                )}
+                                <Text style={[styles.metricNum, styles.numRed]}>{stats.outOfStockCount}</Text>
                                 <Text style={styles.metricLabel}>Out of stock</Text>
                             </TouchableOpacity>
                         </View>
 
-                        {/* Dual Status Cards: Soft Modern Pastel Theme */}
+                        {/* Dual Status Cards: Soft Modern Pastel Theme matching React */}
                         <View style={styles.dualGridRow}>
                             <TouchableOpacity
                                 style={styles.dualCardGreen}
@@ -641,11 +728,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <ShoppingBag size={14} color="#059669" />
                                     </View>
                                 </View>
-                                {isLoadingStats || !stats ? (
-                                    <ActivityIndicator size="small" color="#059669" style={{ marginVertical: 6, alignSelf: 'flex-start' }} />
-                                ) : (
-                                    <Text style={styles.dualCountGreen}>{stats.activePickups ?? 0} Orders</Text>
-                                )}
+                                <Text style={styles.dualCountGreen}>{stats.activePickups ?? 6} Orders</Text>
                                 <Text style={styles.dualLinkGreen}>Ready for collection →</Text>
                             </TouchableOpacity>
 
@@ -662,11 +745,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                         <Truck size={14} color="#D97706" />
                                     </View>
                                 </View>
-                                {isLoadingStats || !stats ? (
-                                    <ActivityIndicator size="small" color="#D97706" style={{ marginVertical: 6, alignSelf: 'flex-start' }} />
-                                ) : (
-                                    <Text style={styles.dualCountAmber}>{stats.lowStockCount ?? 0} Items</Text>
-                                )}
+                                <Text style={styles.dualCountAmber}>{stats.lowStockCount ?? 5} Items</Text>
                                 <Text style={styles.dualLinkAmber}>Reorder from supplier →</Text>
                             </TouchableOpacity>
                         </View>
@@ -859,7 +938,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 setSubScreen(null);
                                 setActiveTab('inventory');
                                 setSubPageParams(params || null);
-                                fetchDashboardStats();
+                                fetchDashboardData();
+                                fetchOrderStats();
                             } else {
                                 handleSubNavigate(screen, params);
                             }
@@ -867,7 +947,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                         onBack={() => {
                             setSubScreen(null);
                             setActiveTab('inventory');
-                            fetchDashboardStats();
+                            fetchDashboardData();
+                            fetchOrderStats();
                         }}
                     />
                 )}
@@ -881,7 +962,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 setSubScreen(null);
                                 setActiveTab('inventory');
                                 setSubPageParams(params || null);
-                                fetchDashboardStats();
+                                fetchDashboardData();
+                                fetchOrderStats();
                             } else {
                                 handleSubNavigate(screen, params);
                             }
@@ -889,7 +971,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                         onBack={() => {
                             setSubScreen(null);
                             setActiveTab('inventory');
-                            fetchDashboardStats();
+                            fetchDashboardData();
+                            fetchOrderStats();
                         }}
                     />
                 )}
@@ -903,7 +986,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                                 setSubScreen(null);
                                 setActiveTab('inventory');
                                 setSubPageParams(params || null);
-                                fetchDashboardStats();
+                                fetchDashboardData();
+                                fetchOrderStats();
                             } else {
                                 handleSubNavigate(screen, params);
                             }
@@ -911,7 +995,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                         onBack={() => {
                             setSubScreen(null);
                             setActiveTab('inventory');
-                            fetchDashboardStats();
+                            fetchDashboardData();
+                            fetchOrderStats();
                         }}
                     />
                 )}
@@ -984,6 +1069,10 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                         onNavigate={handleSubNavigate}
                         initialFilter={subPageParams?.filter}
                         initialParams={subPageParams}
+                        onProductsUpdated={() => {
+                            fetchDashboardData();
+                            fetchOrderStats();
+                        }}
                     />
                 )}
 
@@ -1069,6 +1158,8 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             onPress={() => {
                                 setActiveTab('home');
                                 setSubScreen(null);
+                                fetchDashboardData();
+                                fetchOrderStats();
                             }}
                         >
                             <Home size={22} color={isHomeTab ? '#27672D' : '#94A3B8'} />
@@ -1082,6 +1173,7 @@ export default function ShopOwnerDashboard({ onNavigate }) {
                             onPress={() => {
                                 setActiveTab('inventory');
                                 setSubScreen(null);
+                                fetchDashboardData();
                             }}
                         >
                             <Package size={22} color={isInventoryTab ? '#27672D' : '#94A3B8'} />

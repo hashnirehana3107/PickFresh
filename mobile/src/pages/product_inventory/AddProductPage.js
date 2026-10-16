@@ -404,7 +404,7 @@ export default function AddProductPage({ onNavigate }) {
             if (res.ok && data.success) {
                 setIsSaved(true);
                 setTimeout(() => {
-                    if (onNavigate) onNavigate('product_list', { newProduct: data.product });
+                    if (onNavigate) onNavigate('product_list', { newProduct: data.product, refresh: true });
                 }, 400);
             } else {
                 setErrorMsg(data.message || 'Failed to save product');

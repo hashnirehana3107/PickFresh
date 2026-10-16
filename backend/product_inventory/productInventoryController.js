@@ -225,46 +225,70 @@ const calculateStatus = (stock, minStock) => {
 // 1. Shop Owner Dashboard Summary strictly from MongoDB Atlas for target shop (Ultra Fast Parallel Queries)
 exports.getDashboardStats = async (req, res) => {
     try {
-        const { storeEmail, storeName } = req.query;
-        let targetStoreName = (storeName || '').split('•')[0].trim();
-        let storeRegex = null;
-        if (targetStoreName) {
-            storeRegex = new RegExp(targetStoreName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
-        }
+        const storeEmailParam = (req.query.storeEmail || req.query.email || '').toLowerCase().trim();
+        const storeNameParam = (req.query.storeName || '').trim();
 
         let query = {};
         const orList = [];
-        if (storeEmail) {
-            const cleanEmail = storeEmail.toLowerCase().trim();
-            orList.push({ ownerEmail: cleanEmail });
-            orList.push({ storeEmail: cleanEmail });
+        if (storeEmailParam) {
+            orList.push({ ownerEmail: storeEmailParam });
+            orList.push({ storeEmail: storeEmailParam });
+            if (storeEmailParam.includes('grocery')) {
+                orList.push({ storeName: /grocery/i });
+            } else if (storeEmailParam.includes('lanka')) {
+                orList.push({ storeName: /lanka/i });
+            }
         }
-        if (storeRegex) {
-            orList.push({ storeName: storeRegex });
+        if (storeNameParam) {
+            const clean = storeNameParam.split('•')[0].split('-')[0].trim();
+            if (clean) {
+                orList.push({ storeName: new RegExp(clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') });
+            }
         }
         if (orList.length > 0) {
             query.$or = orList;
         }
 
-        let dbProducts = [];
-        let recentProducts = [];
-        if (productsMemoryCache && productsMemoryCache.length > 0) {
-            dbProducts = productsMemoryCache.filter(p => matchesStoreFilter(p, (storeEmail || '').toLowerCase().trim(), (storeName || '').toLowerCase().trim()));
-            recentProducts = dbProducts.slice(0, 5);
-        } else {
-            const fetched = await Product.find(query).select('name stock stockQuantity minStock lowStockThreshold createdAt updatedAt ownerEmail storeEmail storeName').sort({ createdAt: -1 }).lean();
-            dbProducts = fetched;
-            recentProducts = fetched.slice(0, 5);
+        // Direct lean query from Atlas so counts are ALWAYS 100% live and exact
+        const dbProducts = await Product.find(query)
+            .select('name stock stockQuantity minStock lowStockThreshold createdAt updatedAt ownerEmail storeEmail storeName')
+            .sort({ createdAt: -1 })
+            .lean();
+
+        const recentProducts = dbProducts.slice(0, 5);
+
+        let cleanStore = (storeNameParam || '').split('•')[0].split('-')[0].trim();
+        let storeRegex = null;
+        if (cleanStore) {
+            storeRegex = new RegExp(cleanStore.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+        } else if (storeEmailParam.includes('grocery')) {
+            storeRegex = /grocery/i;
+        } else if (storeEmailParam.includes('lanka')) {
+            storeRegex = /lanka/i;
+        }
+
+        let orderQuery = {
+            status: { $in: ['Pending', 'Preparing', 'Ready for Pickup'] }
+        };
+        if (storeRegex) {
+            orderQuery.$or = [
+                { pickupStore: storeRegex },
+                { storeName: storeRegex }
+            ];
+        }
+
+        let completedOrderQuery = { status: 'Completed' };
+        if (storeRegex) {
+            completedOrderQuery.$or = [
+                { pickupStore: storeRegex },
+                { storeName: storeRegex }
+            ];
         }
 
         // Execute orders queries in parallel
-        let [activePickupsCount, completedOrders] = await Promise.all([
-            storeRegex
-                ? Order.countDocuments({ status: { $in: ['Pending', 'Preparing', 'Ready for Pickup'] }, pickupStore: storeRegex })
-                : (!storeEmail && !storeName ? Order.countDocuments({ status: { $in: ['Pending', 'Preparing', 'Ready for Pickup'] } }) : 0),
-            storeRegex
-                ? Order.find({ status: 'Completed', pickupStore: storeRegex }).select('totalAmount').lean()
-                : (!storeEmail && !storeName ? Order.find({ status: 'Completed' }).select('totalAmount').lean() : []),
+        const [activePickupsCount, completedOrders] = await Promise.all([
+            Order.countDocuments(orderQuery),
+            Order.find(completedOrderQuery).select('totalAmount').lean()
         ]);
 
         const totalProducts = dbProducts.length;
@@ -442,7 +466,10 @@ const matchesStoreFilter = (p, storeEmailParam, storeNameParam) => {
         if (storeEmailParam.includes('grocery') && (pStoreName.includes('grocery') || pOwner.includes('grocery'))) return true;
         if (storeEmailParam.includes('lanka') && (pStoreName.includes('lanka') || pOwner.includes('lanka'))) return true;
     }
-    if (storeNameParam && (pStoreName.includes(storeNameParam) || storeNameParam.includes(pStoreName))) return true;
+    if (storeNameParam) {
+        const clean = storeNameParam.split('•')[0].split('-')[0].trim().toLowerCase();
+        if (clean && (pStoreName.includes(clean) || clean.includes(pStoreName))) return true;
+    }
     return false;
 };
 
@@ -454,8 +481,8 @@ exports.getProducts = async (req, res) => {
         const storeNameParam = (req.query.storeName || '').toLowerCase().trim();
         const explicitRefresh = req.query.refresh === 'true';
 
-        // 1. Return from synchronized RAM cache instantly (<5ms)
-        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0) {
+        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 3s)
+        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 3000)) {
             const filtered = productsMemoryCache.filter(p => matchesStoreFilter(p, storeEmailParam, storeNameParam));
             return res.json({ success: true, count: filtered.length, products: filtered });
         }
@@ -473,7 +500,10 @@ exports.getProducts = async (req, res) => {
             }
         }
         if (storeNameParam) {
-            orList.push({ storeName: new RegExp(storeNameParam.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') });
+            const clean = storeNameParam.split('•')[0].split('-')[0].trim();
+            if (clean) {
+                orList.push({ storeName: new RegExp(clean.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') });
+            }
         }
         if (orList.length > 0) {
             query.$or = orList;
@@ -520,9 +550,6 @@ exports.getProducts = async (req, res) => {
 // 3. Add New Product (Saves directly to MongoDB 'products' collection & immediately updates cache)
 exports.addProduct = async (req, res) => {
     try {
-        const connectDB = require('../config/db');
-        await connectDB();
-
         const stockNum = Number(req.body.stock) || Number(req.body.stockQuantity) || 0;
         const minStockNum = Number(req.body.minStock) || Number(req.body.lowStockThreshold) || 10;
         const status = calculateStatus(stockNum, minStockNum);
@@ -608,9 +635,6 @@ exports.addProduct = async (req, res) => {
 exports.updateProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const connectDB = require('../config/db');
-        await connectDB();
-
         const stockNum = req.body.stock !== undefined ? Number(req.body.stock) : undefined;
         const minStockNum = req.body.minStock !== undefined ? Number(req.body.minStock) : undefined;
 
@@ -635,42 +659,19 @@ exports.updateProduct = async (req, res) => {
             updateFields.lowStockThreshold = finalMin;
         }
 
-        let updatedDoc = null;
-        const isValidId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
-        if (isValidId) {
-            try {
-                updatedDoc = await Product.findByIdAndUpdate(id, updateFields, { new: true });
-            } catch (queryErr) {
-                console.warn('findByIdAndUpdate error, will fallback:', queryErr.message);
-            }
-        }
-
-        if (!updatedDoc) {
-            try {
-                updatedDoc = await Product.findOneAndUpdate(
-                    { $or: [{ _id: id }, { name: updateFields.name || id }] },
-                    updateFields,
-                    { new: true }
-                );
-            } catch (queryErr) {
-                console.warn('findOneAndUpdate error:', queryErr.message);
-            }
-        }
-
+        const updatedDoc = await Product.findByIdAndUpdate(id, updateFields, { new: true });
+        let formatted = null;
         if (updatedDoc) {
-            upsertProductInCache(updatedDoc);
-        } else {
-            upsertProductInCache({ ...updateFields, _id: id, id });
+            formatted = upsertProductInCache(updatedDoc);
         }
         notifyCustomerCacheInvalidation();
 
         return res.json({
             success: true,
             message: 'Product updated successfully in MongoDB products collection',
-            product: updatedDoc || { ...updateFields, _id: id }
+            product: formatted || (updatedDoc ? formatProductDoc(updatedDoc) : null)
         });
     } catch (err) {
-        console.error('Update product error:', err.message);
         return res.status(500).json({ success: false, message: err.message });
     }
 };
@@ -679,22 +680,10 @@ exports.updateProduct = async (req, res) => {
 exports.deleteProduct = async (req, res) => {
     try {
         const { id } = req.params;
-        const connectDB = require('../config/db');
-        await connectDB();
-
-        const isValidId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
-        if (isValidId) {
-            try {
-                await Product.findByIdAndDelete(id);
-            } catch (e) {}
-        } else {
-            try {
-                await Product.findOneAndDelete({ $or: [{ _id: id }, { name: id }] });
-            } catch (e) {}
-        }
+        await Product.findByIdAndDelete(id);
         removeProductFromCache(id);
         notifyCustomerCacheInvalidation();
-        return res.json({ success: true, message: 'Product deleted from MongoDB products collection' });
+        return res.json({ success: true, message: 'Product deleted from MongoDB products collection', deletedId: id });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }

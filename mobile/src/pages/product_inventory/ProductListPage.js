@@ -28,7 +28,7 @@ import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
 import DeleteProductModal from './DeleteProductModal';
 
-export default function ProductListPage({ onNavigate, initialFilter, initialParams }) {
+export default function ProductListPage({ onNavigate, initialFilter, initialParams, onProductsUpdated }) {
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState(initialFilter || 'All');
@@ -121,28 +121,33 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
     }, [initialFilter]);
 
     useEffect(() => {
-        if (initialParams?.newProduct) {
+        if (!initialParams) return;
+
+        if (initialParams.newProduct) {
             setProducts((prev) => {
                 const idStr = String(initialParams.newProduct.id || initialParams.newProduct._id);
                 const filtered = prev.filter((p) => String(p.id || p._id) !== idStr);
                 return [initialParams.newProduct, ...filtered];
             });
             fetchProducts(true);
-        }
-        if (initialParams?.updatedProduct) {
+            if (onProductsUpdated) onProductsUpdated();
+        } else if (initialParams.updatedProduct) {
             setProducts((prev) => {
                 const idStr = String(initialParams.updatedProduct.id || initialParams.updatedProduct._id);
                 return prev.map((p) => (String(p.id || p._id) === idStr ? { ...p, ...initialParams.updatedProduct } : p));
             });
             fetchProducts(true);
-        }
-        if (initialParams?.deletedProductId) {
-            const delId = String(initialParams.deletedProductId);
-            setProducts((prev) => prev.filter((p) => String(p.id || p._id) !== delId));
+            if (onProductsUpdated) onProductsUpdated();
+        } else if (initialParams.deletedProductId) {
+            setProducts((prev) => {
+                const idStr = String(initialParams.deletedProductId);
+                return prev.filter((p) => String(p.id || p._id) !== idStr);
+            });
             fetchProducts(true);
-        }
-        if (initialParams?.refresh) {
+            if (onProductsUpdated) onProductsUpdated();
+        } else if (initialParams.refresh) {
             fetchProducts(true);
+            if (onProductsUpdated) onProductsUpdated();
         }
     }, [initialParams]);
 
@@ -160,23 +165,25 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
 
     const handleConfirmDelete = async (productId) => {
         const idStr = String(productId);
-        // Instant optimistic removal so user sees immediate live deletion!
+        // Optimistic UI update: immediately remove from view
         setProducts((prev) => prev.filter((p) => String(p.id || p._id) !== idStr));
         setDeletingProduct(null);
+        if (onProductsUpdated) onProductsUpdated();
+
         try {
             const res = await fetch(`${API_BASE_URL}/product-inventory/products/${idStr}`, {
                 method: 'DELETE',
             });
             const data = await res.json();
-            if (!data.success) {
-                Alert.alert('Error', data.message || 'Failed to delete product.');
-                fetchProducts(true);
+            if (data.success) {
+                if (onProductsUpdated) onProductsUpdated();
             } else {
                 fetchProducts(true);
+                Alert.alert('Error', data.message || 'Failed to delete product.');
             }
         } catch (e) {
-            Alert.alert('Error', 'Network error while deleting product.');
             fetchProducts(true);
+            Alert.alert('Error', 'Network error while deleting product.');
         }
     };
 
