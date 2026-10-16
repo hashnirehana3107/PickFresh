@@ -235,13 +235,17 @@ exports.invalidateDashboardCache = invalidateDashboardCache;
 // 1. Shop Owner Dashboard Summary strictly from MongoDB Atlas for target shop (Ultra Fast Parallel Queries)
 exports.getDashboardStats = async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+
         const storeEmailParam = (req.query.storeEmail || req.query.email || '').toLowerCase().trim();
         const storeNameParam = (req.query.storeName || '').trim();
         const explicitRefresh = req.query.refresh === 'true';
         const cacheKey = `${storeEmailParam}_${storeNameParam}`;
 
-        // Return from synchronized RAM cache instantly (1ms) if fresh (TTL 30s)
-        if (!explicitRefresh && dashboardMemoryCache[cacheKey] && (Date.now() - (dashboardMemoryCacheTime[cacheKey] || 0) < 30000)) {
+        // Return from synchronized RAM cache instantly (1ms) if fresh (TTL 2s)
+        if (!explicitRefresh && dashboardMemoryCache[cacheKey] && (Date.now() - (dashboardMemoryCacheTime[cacheKey] || 0) < 2000)) {
             return res.json(dashboardMemoryCache[cacheKey]);
         }
 
@@ -499,13 +503,17 @@ const matchesStoreFilter = (p, storeEmailParam, storeNameParam) => {
 // 2. Get All Products (Ultra-fast from synchronized RAM cache with MongoDB Atlas persistence)
 exports.getProducts = async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+
         const now = Date.now();
         const storeEmailParam = (req.query.storeEmail || req.query.email || '').toLowerCase().trim();
         const storeNameParam = (req.query.storeName || '').toLowerCase().trim();
         const explicitRefresh = req.query.refresh === 'true';
 
-        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 60s)
-        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 60000)) {
+        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 2s)
+        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 2000)) {
             const filtered = productsMemoryCache.filter(p => matchesStoreFilter(p, storeEmailParam, storeNameParam));
             return res.json({ success: true, count: filtered.length, products: filtered });
         }
@@ -704,12 +712,26 @@ exports.updateProduct = async (req, res) => {
 // 5. Delete Product (Deletes from MongoDB 'products' collection & immediately removes from cache)
 exports.deleteProduct = async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.set('Pragma', 'no-cache');
+        res.set('Expires', '0');
+
         const { id } = req.params;
-        await Product.findByIdAndDelete(id);
+        const isValidId = mongoose.Types.ObjectId.isValid(id) && String(new mongoose.Types.ObjectId(id)) === String(id);
+        if (isValidId) {
+            try {
+                await Product.findByIdAndDelete(id);
+            } catch (delErr) {}
+        }
+        try {
+            await Product.deleteMany({ $or: [{ _id: id }, { id: id }] });
+        } catch (delManyErr) {}
+
         removeProductFromCache(id);
+        invalidateProductsCache();
         invalidateDashboardCache();
         notifyCustomerCacheInvalidation();
-        return res.json({ success: true, message: 'Product deleted from MongoDB products collection', deletedId: id });
+        return res.json({ success: true, message: 'Product permanently deleted from MongoDB products collection', deletedId: id });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }

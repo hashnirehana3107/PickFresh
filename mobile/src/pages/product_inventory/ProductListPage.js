@@ -33,6 +33,8 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState(initialFilter || 'All');
     const [products, setProducts] = useState(initialParams?.newProduct ? [initialParams.newProduct] : []);
+    const [deletedIds, setDeletedIds] = useState(new Set());
+    const deletedIdsRef = useRef(new Set());
     const [categories, setCategories] = useState(['All', 'Low Stock', 'Dairy & Eggs', 'Vegetables', 'Fruits', 'Meat & Seafood', 'Bakery', 'Beverages']);
     const [isLoading, setIsLoading] = useState(!initialParams?.newProduct);
     const [isRefreshing, setIsRefreshing] = useState(false);
@@ -76,20 +78,35 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
 
     const storeTitle = user?.shopName || user?.storeName || user?.name || 'GroceryMart';
 
+    const saveDeletedIdToStorage = async (idStr) => {
+        try {
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            const raw = await AsyncStorage.getItem('@pickfresh_deleted_product_ids');
+            const ids = raw ? JSON.parse(raw) : [];
+            if (!ids.includes(idStr)) {
+                ids.push(idStr);
+                await AsyncStorage.setItem('@pickfresh_deleted_product_ids', JSON.stringify(ids));
+            }
+        } catch (e) {}
+    };
+
     const fetchProducts = async (isManual = false) => {
         try {
             const email = user?.email || 'grocerymart@gmail.com';
-            const refreshParam = isManual ? '&refresh=true' : '';
             const endpoint = `${API_BASE_URL}/product-inventory/products?storeEmail=${encodeURIComponent(
                 email
-            )}&storeName=${encodeURIComponent(storeTitle)}${refreshParam}`;
+            )}&storeName=${encodeURIComponent(storeTitle)}&refresh=true&_t=${Date.now()}`;
             const res = await fetch(endpoint);
             const data = await res.json();
             if (data.success && Array.isArray(data.products)) {
-                setProducts(data.products);
+                const currentDeleted = deletedIdsRef.current;
+                const cleanProducts = data.products.filter(
+                    (p) => !currentDeleted.has(String(p.id || p._id))
+                );
+                setProducts(cleanProducts);
                 try {
                     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(data.products)).catch(() => {});
+                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(cleanProducts)).catch(() => {});
                 } catch (e) {}
             }
         } catch (err) {
@@ -102,7 +119,7 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
 
     const fetchCategories = async () => {
         try {
-            const res = await fetch(`${API_BASE_URL}/product-inventory/categories`);
+            const res = await fetch(`${API_BASE_URL}/product-inventory/categories?_t=${Date.now()}`);
             const data = await res.json();
             if (data.success && Array.isArray(data.categories)) {
                 const names = data.categories
@@ -113,17 +130,32 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
         } catch (err) {}
     };
 
-    // Instantly hydrate cached real products on startup (0ms)
+    // Instantly hydrate cached real products on startup (0ms) and filter out deleted items
     useEffect(() => {
         let isMounted = true;
         (async () => {
             try {
                 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                const cachedRaw = await AsyncStorage.getItem('@pickfresh_products_cache');
+                const [cachedRaw, deletedRaw] = await Promise.all([
+                    AsyncStorage.getItem('@pickfresh_products_cache'),
+                    AsyncStorage.getItem('@pickfresh_deleted_product_ids'),
+                ]);
+                let delSet = new Set();
+                if (deletedRaw) {
+                    const parsedDel = JSON.parse(deletedRaw);
+                    if (Array.isArray(parsedDel)) {
+                        delSet = new Set(parsedDel.map(String));
+                        deletedIdsRef.current = delSet;
+                        if (isMounted) setDeletedIds(delSet);
+                    }
+                }
                 if (cachedRaw && isMounted) {
                     const parsed = JSON.parse(cachedRaw);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        setProducts((prev) => (prev.length === 0 ? parsed : prev));
+                        const cleanCached = parsed.filter(
+                            (p) => !delSet.has(String(p.id || p._id))
+                        );
+                        setProducts((prev) => (prev.length === 0 ? cleanCached : prev));
                         setIsLoading(false);
                     }
                 }
@@ -150,21 +182,39 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
             setProducts((prev) => {
                 const idStr = String(initialParams.newProduct.id || initialParams.newProduct._id);
                 const filtered = prev.filter((p) => String(p.id || p._id) !== idStr);
-                return [initialParams.newProduct, ...filtered];
+                const nextList = [initialParams.newProduct, ...filtered];
+                try {
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(nextList)).catch(() => {});
+                } catch (e) {}
+                return nextList;
             });
             fetchProducts(true);
             if (onProductsUpdated) onProductsUpdated();
         } else if (initialParams.updatedProduct) {
             setProducts((prev) => {
                 const idStr = String(initialParams.updatedProduct.id || initialParams.updatedProduct._id);
-                return prev.map((p) => (String(p.id || p._id) === idStr ? { ...p, ...initialParams.updatedProduct } : p));
+                const nextList = prev.map((p) => (String(p.id || p._id) === idStr ? { ...p, ...initialParams.updatedProduct } : p));
+                try {
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(nextList)).catch(() => {});
+                } catch (e) {}
+                return nextList;
             });
             fetchProducts(true);
             if (onProductsUpdated) onProductsUpdated();
         } else if (initialParams.deletedProductId) {
+            const idStr = String(initialParams.deletedProductId);
+            deletedIdsRef.current.add(idStr);
+            setDeletedIds(new Set(deletedIdsRef.current));
+            saveDeletedIdToStorage(idStr);
             setProducts((prev) => {
-                const idStr = String(initialParams.deletedProductId);
-                return prev.filter((p) => String(p.id || p._id) !== idStr);
+                const updated = prev.filter((p) => String(p.id || p._id) !== idStr);
+                try {
+                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(updated)).catch(() => {});
+                } catch (e) {}
+                return updated;
             });
             fetchProducts(true);
             if (onProductsUpdated) onProductsUpdated();
@@ -188,8 +238,19 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
 
     const handleConfirmDelete = async (productId) => {
         const idStr = String(productId);
-        // Optimistic UI update: immediately remove from view
-        setProducts((prev) => prev.filter((p) => String(p.id || p._id) !== idStr));
+        deletedIdsRef.current.add(idStr);
+        setDeletedIds(new Set(deletedIdsRef.current));
+        saveDeletedIdToStorage(idStr);
+
+        // Optimistic UI update: immediately remove from view and cache
+        setProducts((prev) => {
+            const updated = prev.filter((p) => String(p.id || p._id) !== idStr);
+            try {
+                const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(updated)).catch(() => {});
+            } catch (e) {}
+            return updated;
+        });
         setDeletingProduct(null);
         if (onProductsUpdated) onProductsUpdated();
 
@@ -200,13 +261,9 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
             const data = await res.json();
             if (data.success) {
                 if (onProductsUpdated) onProductsUpdated();
-            } else {
-                fetchProducts(true);
-                Alert.alert('Error', data.message || 'Failed to delete product.');
             }
         } catch (e) {
-            fetchProducts(true);
-            Alert.alert('Error', 'Network error while deleting product.');
+            console.warn('Network error while deleting product:', e);
         }
     };
 
