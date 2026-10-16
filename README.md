@@ -11,7 +11,7 @@
 
 | Student ID | Member Name | GitHub Username | Assigned Module & Key Features |
 | :--- | :--- | :--- | :--- |
-| **IT23197732** | **H.R Majeed** *(Leader)* | [@hashnirehana3107](https://github.com/hashnirehana3107) | **Product Inventory & Store Management**<br>• Real-time stock level monitoring & low-stock alerts<br>• Store profile, operating hours & banner promotions<br>• Core cross-cutting architecture, Auth Context & Navigation |
+| **IT23197732** | **H.R Majeed** | [@hashnirehana3107](https://github.com/hashnirehana3107) | **Product Inventory & Store Management**<br>• Real-time stock level monitoring & low-stock alerts<br>• Store profile, operating hours & banner promotions<br>• Core cross-cutting architecture, Auth Context & Navigation |
 | **IT23718180** | **W.G.A.D Bandara** | [@Akesha1234](https://github.com/Akesha1234) | **Customer Shopping Experience**<br>• Dynamic store & category product catalog with quick search<br>• Smart produce replacement preferences on checkout<br>• Interactive Cart & Express Pickup slot reservation |
 | **IT23747654** | **M.W.T.D.D Abeykoon** | [@damsara-abeykoon](https://github.com/damsara-abeykoon) | **Order Pickup & Fulfillment**<br>• Express QR Code generation & customer collection pass<br>• Shop Owner pickup verification scanner modal<br>• Real-time order progress timeline (Pending → Ready → Collected) |
 | **IT23718326** | **G.G.A.E Gamaarachchi** | [@Achala-Git](https://github.com/Achala-Git) | **Supplier Replenishment & Logistics**<br>• B2B Wholesale product catalog management (CRUD)<br>• Automated store restock purchase order (PO) handling<br>• Live delivery & dispatch tracking with vehicle/driver telemetry |
