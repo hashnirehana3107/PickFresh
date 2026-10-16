@@ -9,6 +9,9 @@ if (dns.setDefaultResultOrder) {
 const DEFAULT_ATLAS_URI = 'mongodb+srv://rehanahashni2001_db_user:r6CuFSozjBxMKGX9@cluster0.tm1cjxu.mongodb.net/pickfresh_db?retryWrites=true&w=majority';
 
 const connectDB = async (retries = 3) => {
+  if (mongoose.connection.readyState >= 1) {
+    return mongoose.connection;
+  }
   mongoose.set('strictQuery', false);
   const uri = process.env.MONGODB_URI || DEFAULT_ATLAS_URI;
   console.log(' Connecting to MongoDB Atlas Cluster0...');
