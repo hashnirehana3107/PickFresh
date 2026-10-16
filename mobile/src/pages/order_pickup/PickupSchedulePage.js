@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     },
     mainScrollContent: {
         padding: 18,
-        paddingBottom: 36,
+        paddingBottom: Platform.OS === 'android' ? 60 : 36,
         gap: 16,
     },
     titleRow: {

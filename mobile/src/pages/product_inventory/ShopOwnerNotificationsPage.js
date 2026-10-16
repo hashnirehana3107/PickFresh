@@ -5,6 +5,7 @@ import {
     Text,
     TouchableOpacity,
     ScrollView,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -284,7 +285,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     listContent: {
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 70 : 24,
         gap: 12,
     },
     emptyWrap: {

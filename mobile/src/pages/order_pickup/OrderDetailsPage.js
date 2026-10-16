@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Image,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -323,7 +324,7 @@ const styles = StyleSheet.create({
     scrollableContent: {
         paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 44 : 24,
         gap: 14,
     },
     statusBanner: {
@@ -521,7 +522,7 @@ const styles = StyleSheet.create({
         gap: 8,
         paddingHorizontal: 16,
         paddingTop: 12,
-        paddingBottom: 14,
+        paddingBottom: Platform.OS === 'android' ? 24 : 14,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',

@@ -52,8 +52,13 @@ export default function RestockRequestPage({ onNavigate, initialData }) {
     const [reorderQuantities, setReorderQuantities] = useState(initialQuantities);
     const [suppliersFullList, setSuppliersFullList] = useState([]);
     const [suppliersList, setSuppliersList] = useState([]);
-    const [supplier, setSupplier] = useState(initialData?.supplierName || initialData?.supplier?.name || '');
-    const [supplierEmail, setSupplierEmail] = useState(initialData?.supplier?.email || '');
+    const initialSupName = initialData?.supplierName || initialData?.supplier?.name || '';
+    const initialSupEmail = initialData?.supplierEmail || initialData?.supplier?.email || (
+        initialSupName.toLowerCase().includes('lanka mega') ? 'megasupplier@gmail.com' :
+        initialSupName.toLowerCase().includes('central food') ? 'centralfoodcity@gmail.com' : ''
+    );
+    const [supplier, setSupplier] = useState(initialSupName);
+    const [supplierEmail, setSupplierEmail] = useState(initialSupEmail);
     const [isSupplierDropdownOpen, setIsSupplierDropdownOpen] = useState(false);
 
     const today = new Date();
@@ -197,9 +202,14 @@ export default function RestockRequestPage({ onNavigate, initialData }) {
                             setSupplier(selected.name);
                             setSupplierEmail(selected.email || '');
                         } else {
-                            const foundSupplierStr = initialData?.supplierName || initialData?.supplier?.name;
-                            const matched = linkedSuppliers.find((s) => s.name === foundSupplierStr);
-                            if (matched) setSupplierEmail(matched.email || '');
+                            const foundSupplierStr = initialData?.supplierName || initialData?.supplier?.name || '';
+                            const matched = linkedSuppliers.find((s) => s.name?.toLowerCase() === foundSupplierStr.toLowerCase() || (s.name && foundSupplierStr && s.name.toLowerCase().includes(foundSupplierStr.toLowerCase())));
+                            if (matched && matched.email) {
+                                setSupplierEmail(matched.email);
+                            } else if (!supplierEmail) {
+                                if (foundSupplierStr.toLowerCase().includes('lanka mega')) setSupplierEmail('megasupplier@gmail.com');
+                                else if (foundSupplierStr.toLowerCase().includes('central food')) setSupplierEmail('centralfoodcity@gmail.com');
+                            }
                         }
                     }
                 }
@@ -215,7 +225,7 @@ export default function RestockRequestPage({ onNavigate, initialData }) {
 
     useEffect(() => {
         if (supplier) {
-            fetch(`http://localhost:5000/api/supplier-replenishment/catalog?supplierName=${encodeURIComponent(supplier)}`)
+            fetch(`${API_BASE_URL}/supplier-replenishment/catalog?supplierName=${encodeURIComponent(supplier)}`)
                 .then((res) => res.json())
                 .then((data) => {
                     if (data.success && Array.isArray(data.products)) {
@@ -291,10 +301,19 @@ export default function RestockRequestPage({ onNavigate, initialData }) {
 
         const totalEstimate = restockItems.reduce((acc, it) => acc + (it.subtotal || 0), 0);
 
+        let resolvedSupEmail = supplierEmail;
+        if (!resolvedSupEmail) {
+            if (supplier?.toLowerCase().includes('lanka mega') || supplier?.toLowerCase().includes('mega')) {
+                resolvedSupEmail = 'megasupplier@gmail.com';
+            } else if (supplier?.toLowerCase().includes('central food')) {
+                resolvedSupEmail = 'centralfoodcity@gmail.com';
+            }
+        }
+
         const poPayload = {
             supplierName: supplier,
-            supplierEmail,
-            storeName: user?.shopName || user?.storeName || user?.name || 'Lanka Mart',
+            supplierEmail: resolvedSupEmail,
+            storeName: user?.shopName || user?.storeName || user?.name || 'GroceryMart',
             storeEmail: user?.email || '',
             deliveryDate,
             status: 'Pending',
@@ -304,7 +323,7 @@ export default function RestockRequestPage({ onNavigate, initialData }) {
         };
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3500);
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
 
         try {
             await fetch(`${API_BASE_URL}/product-inventory/restock-requests`, {
@@ -703,7 +722,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 18,
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 44 : 24,
     },
     fixedBottomActionBar: {
         backgroundColor: '#FFFFFF',
@@ -711,7 +730,7 @@ const styles = StyleSheet.create({
         borderTopColor: '#E2E8F0',
         paddingHorizontal: 18,
         paddingTop: 12,
-        paddingBottom: 14,
+        paddingBottom: Platform.OS === 'android' ? 24 : 14,
         gap: 10,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -3 },

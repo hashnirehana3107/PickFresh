@@ -1195,7 +1195,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 12,
-        paddingBottom: 28,
+        paddingBottom: Platform.OS === 'android' ? 95 : 28,
         alignItems: 'center',
     },
     topNav: {

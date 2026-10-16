@@ -8,6 +8,7 @@ import {
     ScrollView,
     Image,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import {
     Search,
@@ -470,7 +471,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 18,
         paddingTop: 14,
-        paddingBottom: 30,
+        paddingBottom: Platform.OS === 'android' ? 50 : 30,
     },
     storeBadgeBar: {
         flexDirection: 'row',

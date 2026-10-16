@@ -7,6 +7,7 @@ import {
     ScrollView,
     Image,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -328,7 +329,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 14,
-        paddingBottom: 90,
+        paddingBottom: Platform.OS === 'android' ? 110 : 90,
     },
     alertCard: {
         backgroundColor: '#FEF3C7',
@@ -470,7 +471,8 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',
         paddingHorizontal: 20,
-        paddingVertical: 14,
+        paddingTop: 14,
+        paddingBottom: Platform.OS === 'android' ? 22 : 14,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -3 },
         shadowOpacity: 0.05,

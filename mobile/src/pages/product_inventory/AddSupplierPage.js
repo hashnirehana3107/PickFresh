@@ -7,6 +7,7 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import { ArrowLeft, Check, Trash2 } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
@@ -196,7 +197,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         padding: 18,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 70 : 40,
     },
     titleRow: {
         flexDirection: 'row',

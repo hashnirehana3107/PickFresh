@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Image,
+    Platform,
 } from 'react-native';
 import { Leaf, Clock, Sparkles } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -143,7 +144,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FAFBF8',
     },
     contentContainer: {
-        paddingBottom: 32,
+        paddingBottom: Platform.OS === 'android' ? 95 : 32,
     },
     heroWrap: {
         width: '100%',

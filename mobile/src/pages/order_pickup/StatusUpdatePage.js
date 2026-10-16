@@ -7,6 +7,7 @@ import {
     ScrollView,
     Image,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -301,7 +302,7 @@ const styles = StyleSheet.create({
     },
     scrollableContent: {
         padding: 16,
-        paddingBottom: 20,
+        paddingBottom: Platform.OS === 'android' ? 44 : 20,
         gap: 12,
     },
     header: {
@@ -512,7 +513,7 @@ const styles = StyleSheet.create({
         gap: 10,
         paddingHorizontal: 16,
         paddingTop: 12,
-        paddingBottom: 16,
+        paddingBottom: Platform.OS === 'android' ? 24 : 16,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',

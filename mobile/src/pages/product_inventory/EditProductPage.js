@@ -570,7 +570,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         padding: 18,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 70 : 40,
     },
     titleRow: {
         flexDirection: 'row',

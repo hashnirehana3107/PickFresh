@@ -949,7 +949,19 @@ exports.createRestockRequest = async (req, res) => {
         let supplierName = (req.body.supplierName || '').trim();
         let supplierEmail = (req.body.supplierEmail || '').trim().toLowerCase();
 
-        // 1. If supplierName is empty or Default Supplier, look up from memory cache or items
+        // Known suppliers fallback dictionary
+        const KNOWN_SUPPLIERS = {
+            'lanka mega wholesale distributors': 'megasupplier@gmail.com',
+            'central food city': 'centralfoodcity@gmail.com',
+            'bla bla supplier': 'blabla123@gmail.con'
+        };
+
+        const sKey = supplierName.toLowerCase();
+        if (!supplierEmail && KNOWN_SUPPLIERS[sKey]) {
+            supplierEmail = KNOWN_SUPPLIERS[sKey];
+        }
+
+        // 1. If supplierName is empty or Default Supplier, look up from items
         if ((!supplierName || supplierName === 'Default Supplier' || supplierName === 'Local Supplier') && req.body.items && req.body.items.length > 0) {
             const firstItemName = req.body.items[0].name || req.body.items[0].produce;
             if (firstItemName && productsMemoryCache && Array.isArray(productsMemoryCache)) {
@@ -963,7 +975,7 @@ exports.createRestockRequest = async (req, res) => {
                 try {
                     const prodDoc = await Product.findOne({
                         name: { $regex: `^${firstItemName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, $options: 'i' }
-                    }).select('supplierName supplierEmail').maxTimeMS(600).lean();
+                    }).select('supplierName supplierEmail').maxTimeMS(3000).lean();
                     if (prodDoc) {
                         if (prodDoc.supplierName) supplierName = prodDoc.supplierName;
                         if (prodDoc.supplierEmail) supplierEmail = prodDoc.supplierEmail.toLowerCase().trim();
@@ -980,25 +992,38 @@ exports.createRestockRequest = async (req, res) => {
                 const foundUser = await User.findOne({
                     role: 'supplier',
                     $or: [
-                        { supplierName: { $regex: `^${esc}$`, $options: 'i' } },
-                        { name: { $regex: `^${esc}$`, $options: 'i' } }
+                        { supplierName: { $regex: esc, $options: 'i' } },
+                        { name: { $regex: esc, $options: 'i' } }
                     ]
-                }).select('email supplierName name').maxTimeMS(600).lean();
+                }).select('email supplierName name').maxTimeMS(5000).lean();
                 if (foundUser && foundUser.email) {
                     supplierEmail = foundUser.email.toLowerCase().trim();
+                    if (!supplierName) supplierName = foundUser.supplierName || foundUser.name;
                 } else {
                     const { Supplier } = require('./ProductInventoryModel');
                     const foundSup = await Supplier.findOne({
-                        name: { $regex: `^${esc}$`, $options: 'i' }
-                    }).select('email name').maxTimeMS(600).lean();
+                        name: { $regex: esc, $options: 'i' }
+                    }).select('email name').maxTimeMS(5000).lean();
                     if (foundSup && foundSup.email) {
                         supplierEmail = foundSup.email.toLowerCase().trim();
                     }
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.warn('Error resolving supplier:', e.message);
+            }
         }
 
-        if (!supplierName) supplierName = 'Default Supplier';
+        // 3. Fallback to known mapping if still not resolved
+        if (!supplierEmail) {
+            for (const [k, v] of Object.entries(KNOWN_SUPPLIERS)) {
+                if (sKey.includes(k) || k.includes(sKey)) {
+                    supplierEmail = v;
+                    break;
+                }
+            }
+        }
+
+        if (!supplierName) supplierName = 'Lanka Mega Wholesale Distributors';
 
         req.body.supplierName = supplierName;
         req.body.supplierEmail = supplierEmail;
@@ -1006,21 +1031,26 @@ exports.createRestockRequest = async (req, res) => {
         const SupplierReplenishment = require('../supplier_replenishment/SupplierReplenishmentModel');
         const SupplierNotification = require('../models/SupplierNotification');
 
-        // Generate non-colliding PO number (instant index query with fallback)
+        // Generate non-colliding PO number
         let poNum = req.body.poNumber;
         if (!poNum) {
             let maxNum = 0;
             try {
-                const lastDoc = await RestockRequest.findOne({}, { poNumber: 1 })
-                    .sort({ _id: -1 })
-                    .maxTimeMS(500)
-                    .lean();
-                if (lastDoc && lastDoc.poNumber) {
-                    const match = String(lastDoc.poNumber).match(/(\d+)/);
-                    if (match) {
-                        maxNum = parseInt(match[1], 10);
+                const [lastRestocks, lastReps] = await Promise.all([
+                    RestockRequest.find({}, { poNumber: 1 }).sort({ _id: -1 }).limit(30).maxTimeMS(5000).lean().catch(() => []),
+                    SupplierReplenishment.find({}, { poId: 1 }).sort({ _id: -1 }).limit(30).maxTimeMS(5000).lean().catch(() => [])
+                ]);
+
+                [...(lastRestocks || []), ...(lastReps || [])].forEach((doc) => {
+                    const val = doc.poNumber || doc.poId;
+                    if (val) {
+                        const match = String(val).match(/(\d+)/);
+                        if (match) {
+                            const parsed = parseInt(match[1], 10);
+                            if (parsed > maxNum) maxNum = parsed;
+                        }
                     }
-                }
+                });
             } catch (e) {}
 
             if (maxNum > 0) {
@@ -1115,19 +1145,15 @@ exports.createRestockRequest = async (req, res) => {
 
         const po = await RestockRequest.create(req.body);
 
-        // Instantly return HTTP 201 so the mobile app gets immediate feedback (<150ms)!
-        res.status(201).json({
-            success: true,
-            message: 'Restock PO created and sent to supplier in MongoDB Atlas',
-            po
-        });
-
-        // Non-blocking background sync to SupplierReplenishment & SupplierNotification collections
+        // Immediate background sync to SupplierReplenishment & SupplierNotification collections
         (async () => {
             try {
                 const notificationMessage = `${storeName} requested replenishment: ${itemsSummary} (Total: Rs. ${totalAmount.toLocaleString()}).`;
-                await Promise.allSettled([
-                    SupplierReplenishment.create({
+
+                // Safe upsert / create to avoid duplicate key error
+                await SupplierReplenishment.findOneAndUpdate(
+                    { poId: poNum },
+                    {
                         poId: poNum,
                         storeName: storeName,
                         storeEmail: storeEmail,
@@ -1143,25 +1169,34 @@ exports.createRestockRequest = async (req, res) => {
                         itemsSummary: itemsSummary,
                         items: itemsArray,
                         totalAmount: totalAmount
-                    }),
-                    SupplierNotification.create({
-                        supplierName: supplierName,
-                        supplierEmail: supplierEmail,
-                        type: 'po',
-                        title: `New Restock Request ${poNum}`,
-                        message: notificationMessage,
-                        read: false
-                    })
-                ]);
-                try {
-                    const { clearSupplierCaches } = require('../supplier_replenishment/supplierReplenishmentController');
-                    if (clearSupplierCaches) clearSupplierCaches();
-                } catch (e) {}
+                    },
+                    { upsert: true, new: true, setDefaultsOnInsert: true }
+                );
+
+                await SupplierNotification.create({
+                    supplierName: supplierName,
+                    supplierEmail: supplierEmail,
+                    type: 'po',
+                    title: `New Restock Request ${poNum}`,
+                    message: notificationMessage,
+                    read: false
+                });
+
+                console.log(`✅ [RESTOCK] Sync to supplier ${supplierName} (${supplierEmail}) completed for PO ${poNum}`);
+
+                const { clearSupplierCaches } = require('../supplier_replenishment/supplierReplenishmentController');
+                if (clearSupplierCaches) clearSupplierCaches();
             } catch (syncErr) {
-                console.warn('Sync to Supplier notice:', syncErr.message);
+                console.warn('Sync to Supplier error:', syncErr.message);
             }
         })();
-        return;
+
+        // Instantly return HTTP 201 so the mobile app gets immediate feedback (<150ms)!
+        return res.status(201).json({
+            success: true,
+            message: 'Restock PO created and sent to supplier in MongoDB Atlas',
+            po
+        });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
     }

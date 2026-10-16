@@ -448,6 +448,8 @@ exports.getDashboardStats = async (req, res) => {
             const dName = (doc.supplierName || '').toLowerCase().trim();
             if (sEmailLower && dEmail && dEmail === sEmailLower) return true;
             if (sNameLower && dName && (dName.includes(sNameLower) || sNameLower.includes(dName))) return true;
+            if (sEmailLower === 'megasupplier@gmail.com' && (dName.includes('lanka mega') || dName.includes('mega'))) return true;
+            if (sEmailLower === 'centralfoodcity@gmail.com' && (dName.includes('central food') || dName.includes('central'))) return true;
             return false;
         };
 
@@ -578,6 +580,8 @@ exports.getReplenishmentRequests = async (req, res) => {
             const dName = (doc.supplierName || '').toLowerCase().trim();
             if (sEmailLower && dEmail && dEmail === sEmailLower) return true;
             if (sNameLower && dName && (dName.includes(sNameLower) || sNameLower.includes(dName))) return true;
+            if (sEmailLower === 'megasupplier@gmail.com' && (dName.includes('lanka mega') || dName.includes('mega'))) return true;
+            if (sEmailLower === 'centralfoodcity@gmail.com' && (dName.includes('central food') || dName.includes('central'))) return true;
             return false;
         };
 

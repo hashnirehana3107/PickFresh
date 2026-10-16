@@ -308,7 +308,7 @@ const styles = StyleSheet.create({
     listContainer: {
         padding: 16,
         gap: 10,
-        paddingBottom: 80,
+        paddingBottom: Platform.OS === 'android' ? 104 : 80,
     },
     card: {
         flexDirection: 'row',
@@ -363,7 +363,9 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         backgroundColor: '#FFFFFF',
-        padding: 16,
+        paddingHorizontal: 16,
+        paddingTop: 16,
+        paddingBottom: Platform.OS === 'android' ? 24 : 16,
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',
     },

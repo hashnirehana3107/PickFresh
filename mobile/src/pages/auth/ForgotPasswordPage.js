@@ -6,6 +6,7 @@ import {
     TextInput,
     TouchableOpacity,
     ScrollView,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -226,8 +227,8 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 22,
-        paddingTop: 16,
-        paddingBottom: 40,
+        paddingTop: Platform.OS === 'android' ? 10 : 16,
+        paddingBottom: Platform.OS === 'android' ? 95 : 40,
     },
     topBar: {
         flexDirection: 'row',

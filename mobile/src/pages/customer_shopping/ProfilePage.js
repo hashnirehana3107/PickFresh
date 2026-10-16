@@ -775,6 +775,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 22,
         paddingTop: 18,
+        paddingBottom: Platform.OS === 'android' ? 160 : 130,
     },
     toastBox: {
         flexDirection: 'row',
@@ -1089,7 +1090,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 20,
         paddingTop: 12,
-        paddingBottom: 14,
+        paddingBottom: Platform.OS === 'android' ? 22 : 14,
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',
         shadowColor: '#000000',

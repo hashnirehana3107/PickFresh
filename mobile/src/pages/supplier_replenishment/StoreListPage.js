@@ -320,7 +320,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 18,
         paddingVertical: 16,
-        paddingBottom: 32,
+        paddingBottom: Platform.OS === 'android' ? 60 : 32,
     },
     cardsStack: {
         gap: 10,

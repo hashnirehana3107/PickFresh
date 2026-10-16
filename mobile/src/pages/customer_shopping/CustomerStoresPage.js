@@ -8,6 +8,7 @@ import {
     TextInput,
     Image,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -304,7 +305,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 16,
-        paddingBottom: 20,
+        paddingBottom: Platform.OS === 'android' ? 44 : 20,
         gap: 12,
     },
     bottomSpacer: {

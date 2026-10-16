@@ -908,7 +908,8 @@ const styles = StyleSheet.create({
 
     // Fixed Bottom Navigation Bar Matching Web Prototype (4 Tabs)
     bottomNavBar: {
-        height: 64,
+        height: Platform.OS === 'android' ? 76 : 64,
+        paddingBottom: Platform.OS === 'android' ? 12 : 0,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',

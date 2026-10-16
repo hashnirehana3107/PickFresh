@@ -11,6 +11,7 @@ import {
     Modal,
     AppState,
     Animated,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -729,7 +730,7 @@ const styles = StyleSheet.create({
     // Scroll content
     scrollContent: {
         paddingHorizontal: 24,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 60 : 40,
     },
     // Loading
     loadingWrap: {

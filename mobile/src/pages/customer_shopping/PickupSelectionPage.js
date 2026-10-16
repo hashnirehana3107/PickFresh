@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     ActivityIndicator,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -344,7 +345,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 18,
         paddingTop: 16,
-        paddingBottom: 20,
+        paddingBottom: Platform.OS === 'android' ? 44 : 20,
     },
 
     /* ── Store banner (.pickup-store-banner) ── */

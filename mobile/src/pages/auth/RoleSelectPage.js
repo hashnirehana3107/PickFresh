@@ -5,6 +5,7 @@ import {
     Text,
     TouchableOpacity,
     ScrollView,
+    Platform,
 } from 'react-native';
 import { ArrowLeft, ShoppingCart, Store, Truck, Check } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         paddingHorizontal: 20,
-        paddingBottom: 28,
+        paddingBottom: Platform.OS === 'android' ? 95 : 28,
         flexGrow: 1,
     },
     header: {

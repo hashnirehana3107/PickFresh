@@ -7,6 +7,7 @@ import {
     ScrollView,
     Image,
     Animated,
+    Platform,
 } from 'react-native';
 import {
     Clock,
@@ -248,7 +249,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 60 : 40,
     },
 
     /* ── Header — centered ── */

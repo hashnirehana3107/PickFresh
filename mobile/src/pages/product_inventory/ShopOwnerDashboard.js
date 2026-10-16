@@ -2168,6 +2168,8 @@ const styles = StyleSheet.create({
         justifyContent: 'space-around',
         alignItems: 'center',
         paddingVertical: 8,
+        paddingBottom: Platform.OS === 'android' ? 14 : 8,
+        height: Platform.OS === 'android' ? 68 : undefined,
     },
     navItem: {
         flex: 1,

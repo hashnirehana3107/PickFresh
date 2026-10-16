@@ -11,6 +11,7 @@ import {
     Alert,
     Animated,
     Easing,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -467,7 +468,7 @@ const styles = StyleSheet.create({
     mainScrollContent: {
         paddingHorizontal: 16,
         paddingTop: 14,
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 50 : 24,
     },
     titleRow: {
         flexDirection: 'row',

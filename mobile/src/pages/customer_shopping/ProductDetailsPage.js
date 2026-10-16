@@ -453,7 +453,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 16,
-        paddingBottom: 100,
+        paddingBottom: Platform.OS === 'android' ? 124 : 100,
     },
     heroImageCard: {
         width: '100%',
@@ -750,7 +750,8 @@ const styles = StyleSheet.create({
         right: 0,
         backgroundColor: '#FFFFFF',
         paddingHorizontal: 20,
-        paddingVertical: 14,
+        paddingTop: 14,
+        paddingBottom: Platform.OS === 'android' ? 24 : 14,
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',
     },

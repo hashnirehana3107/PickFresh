@@ -6,6 +6,7 @@ import {
     TouchableOpacity,
     ScrollView,
     Image,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -411,7 +412,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 14,
-        paddingBottom: 100,
+        paddingBottom: Platform.OS === 'android' ? 124 : 100,
     },
     smartSwapBanner: {
         flexDirection: 'row',
@@ -685,7 +686,8 @@ const styles = StyleSheet.create({
         borderTopWidth: 1,
         borderTopColor: '#E2E8F0',
         paddingHorizontal: 18,
-        paddingVertical: 12,
+        paddingTop: 12,
+        paddingBottom: Platform.OS === 'android' ? 24 : 12,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',

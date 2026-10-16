@@ -5,6 +5,7 @@ import {
     Text,
     TouchableOpacity,
     ScrollView,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -225,7 +226,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 20,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 60 : 40,
     },
     bottomSpacer: {
         height: 24,

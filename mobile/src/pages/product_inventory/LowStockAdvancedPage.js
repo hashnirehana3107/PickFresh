@@ -7,6 +7,7 @@ import {
     ScrollView,
     ActivityIndicator,
     Image,
+    Platform,
 } from 'react-native';
 import {
     ArrowLeft,
@@ -32,6 +33,8 @@ export default function LowStockAdvancedPage({ onNavigate }) {
     const [alertItems, setAlertItems] = useState([]);
     const [fetchError, setFetchError] = useState(false);
     const [sentItems, setSentItems] = useState(new Set());
+    const [sendingSupplier, setSendingSupplier] = useState(null);
+    const [toastMessage, setToastMessage] = useState('');
 
     const activeStatuses = ['Pending', 'Pending Approval', 'Accepted', 'Approved', 'Shipped', 'Dispatched', 'In Transit', 'Confirmed', 'Packed'];
 
@@ -125,39 +128,63 @@ export default function LowStockAdvancedPage({ onNavigate }) {
     }, [user?.email]);
 
     const handleSendRequest = async (supplier, items) => {
+        setSendingSupplier(supplier);
         const itemNames = items.map((i) => i.name);
-        setSentItems((prev) => new Set([...prev, supplier, ...itemNames]));
 
         try {
             const today = new Date();
             const tomorrow = new Date(today);
             tomorrow.setDate(today.getDate() + 1);
+            const tomorrowFormatted = `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`;
 
-            const resolvedSupplierEmail = items.find(it => it.supplierEmail)?.supplierEmail || '';
+            let resolvedSupplierEmail = items.find((it) => it.supplierEmail)?.supplierEmail || '';
+            if (!resolvedSupplierEmail) {
+                const sLower = supplier.toLowerCase();
+                if (sLower.includes('lanka mega') || sLower.includes('mega')) {
+                    resolvedSupplierEmail = 'megasupplier@gmail.com';
+                } else if (sLower.includes('central food') || sLower.includes('central')) {
+                    resolvedSupplierEmail = 'centralfoodcity@gmail.com';
+                }
+            }
 
             const payload = {
                 supplierName: supplier,
                 supplierEmail: resolvedSupplierEmail,
-                storeName: user?.shopName || user?.storeName || user?.name || 'Lanka Mart',
+                storeName: user?.shopName || user?.storeName || user?.name || 'GroceryMart',
                 storeEmail: user?.email || '',
-                deliveryDate: tomorrow.toISOString().split('T')[0],
+                deliveryDate: tomorrowFormatted,
+                deliveryTarget: tomorrowFormatted,
                 status: 'Pending',
                 items: items.map((i) => ({
+                    id: i.id,
                     name: i.name,
+                    produce: i.name,
                     quantity: i.threshold ? i.threshold * 2 : 20,
-                    unit: i.unit || 'units',
+                    qty: i.threshold ? i.threshold * 2 : 20,
+                    unit: i.unit || 'pack',
                     currentStock: i.currentStock,
+                    threshold: i.threshold || 10,
+                    image: i.image || '',
+                    imageUrl: i.image || '',
                 })),
                 notes: 'Automated low stock restock order.',
             };
 
-            await fetch(`${API_BASE_URL}/product-inventory/restock-requests`, {
+            const res = await fetch(`${API_BASE_URL}/product-inventory/restock-requests`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             });
+            const data = await res.json();
+            if (data.success) {
+                setSentItems((prev) => new Set([...prev, supplier, ...itemNames]));
+                setToastMessage(`Restock request sent to ${supplier}!`);
+                setTimeout(() => setToastMessage(''), 4000);
+            }
         } catch (err) {
             console.warn('Failed to submit restock request:', err);
+        } finally {
+            setSendingSupplier(null);
         }
     };
 
@@ -184,6 +211,14 @@ export default function LowStockAdvancedPage({ onNavigate }) {
                     <ArrowLeft size={20} color="#0F172A" />
                 </TouchableOpacity>
             </View>
+
+            {/* Success Toast */}
+            {toastMessage ? (
+                <View style={styles.toastBanner}>
+                    <CheckCircle2 size={18} color="#166534" />
+                    <Text style={styles.toastBannerText}>{toastMessage}</Text>
+                </View>
+            ) : null}
 
             {/* Banner Card */}
             <View style={styles.bannerCard}>
@@ -255,24 +290,48 @@ export default function LowStockAdvancedPage({ onNavigate }) {
                                                 <Text style={styles.sentBadgeText}>Request Sent</Text>
                                             </View>
                                         ) : (
-                                            <TouchableOpacity
-                                                style={styles.sendBtn}
-                                                onPress={() => {
-                                                    if (onNavigate) {
-                                                        onNavigate('restock_request', {
-                                                            supplierName: supplier,
-                                                            items: items,
-                                                            fromScreen: 'low_stock',
-                                                        });
-                                                    } else {
-                                                        handleSendRequest(supplier, items);
-                                                    }
-                                                }}
-                                                activeOpacity={0.85}
-                                            >
-                                                <Send size={15} color="#D97706" />
-                                                <Text style={styles.sendBtnText}>Send Request</Text>
-                                            </TouchableOpacity>
+                                            <View style={styles.btnRow}>
+                                                <TouchableOpacity
+                                                    style={[styles.sendBtn, { flex: 1 }]}
+                                                    onPress={() => handleSendRequest(supplier, items)}
+                                                    disabled={sendingSupplier === supplier}
+                                                    activeOpacity={0.85}
+                                                >
+                                                    {sendingSupplier === supplier ? (
+                                                        <ActivityIndicator size="small" color="#D97706" />
+                                                    ) : (
+                                                        <Send size={15} color="#D97706" />
+                                                    )}
+                                                    <Text style={styles.sendBtnText}>
+                                                        {sendingSupplier === supplier ? 'Sending...' : 'Send Request'}
+                                                    </Text>
+                                                </TouchableOpacity>
+
+                                                {onNavigate && (
+                                                    <TouchableOpacity
+                                                        style={styles.reviewBtn}
+                                                        onPress={() => {
+                                                            let supEmail = items.find((it) => it.supplierEmail)?.supplierEmail || '';
+                                                            if (!supEmail) {
+                                                                if (supplier.toLowerCase().includes('lanka mega')) supEmail = 'megasupplier@gmail.com';
+                                                                else if (supplier.toLowerCase().includes('central food')) supEmail = 'centralfoodcity@gmail.com';
+                                                            }
+                                                            onNavigate('restock_request', {
+                                                                supplierName: supplier,
+                                                                supplierEmail: supEmail,
+                                                                items: items,
+                                                                fromScreen: 'low_stock',
+                                                                onRequestSent: () => {
+                                                                    setSentItems((prev) => new Set([...prev, supplier, ...items.map(it => it.name)]));
+                                                                },
+                                                            });
+                                                        }}
+                                                        activeOpacity={0.8}
+                                                    >
+                                                        <Text style={styles.reviewBtnText}>Customize</Text>
+                                                    </TouchableOpacity>
+                                                )}
+                                            </View>
                                         )}
                                     </View>
                                 </View>
@@ -320,7 +379,7 @@ const styles = StyleSheet.create({
     },
     contentContainer: {
         padding: 18,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 60 : 40,
     },
     titleRow: {
         flexDirection: 'row',
@@ -480,6 +539,44 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: 6,
+    },
+    btnRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    reviewBtn: {
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1.5,
+        borderColor: '#CBD5E1',
+        borderRadius: 12,
+        paddingVertical: 10,
+        paddingHorizontal: 14,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    reviewBtnText: {
+        color: '#475569',
+        fontSize: 13,
+        fontWeight: '700',
+    },
+    toastBanner: {
+        backgroundColor: '#DCFCE7',
+        borderWidth: 1,
+        borderColor: '#86EFAC',
+        borderRadius: 14,
+        padding: 12,
+        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        marginBottom: 16,
+    },
+    toastBannerText: {
+        color: '#166534',
+        fontSize: 13.5,
+        fontWeight: '700',
+        flex: 1,
     },
     sendBtnText: {
         color: '#D97706',

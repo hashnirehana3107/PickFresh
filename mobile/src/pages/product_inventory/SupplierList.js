@@ -1217,7 +1217,7 @@ const styles = StyleSheet.create({
     mainScrollContent: {
         paddingHorizontal: 16,
         paddingTop: 16,
-        paddingBottom: 40,
+        paddingBottom: Platform.OS === 'android' ? 60 : 40,
     },
     titleRow: {
         flexDirection: 'row',

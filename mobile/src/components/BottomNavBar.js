@@ -1,5 +1,5 @@
 import React from 'react';
-import { StyleSheet, View, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, Platform } from 'react-native';
 import { Home, Search, ShoppingCart, User } from 'lucide-react-native';
 
 export default function BottomNavBar({ activeTab, onTabPress, cartCount = 0 }) {
@@ -44,7 +44,8 @@ export default function BottomNavBar({ activeTab, onTabPress, cartCount = 0 }) {
 
 const styles = StyleSheet.create({
     navBar: {
-        height: 65,
+        height: Platform.OS === 'android' ? 76 : 65,
+        paddingBottom: Platform.OS === 'android' ? 12 : 0,
         backgroundColor: '#FFFFFF',
         borderTopWidth: 1,
         borderTopColor: '#F1F5F9',

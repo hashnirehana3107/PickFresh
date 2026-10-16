@@ -401,8 +401,8 @@ const styles = StyleSheet.create({
     scrollContent: {
         flexGrow: 1,
         paddingHorizontal: 20,
-        paddingTop: 16,
-        paddingBottom: 28,
+        paddingTop: Platform.OS === 'android' ? 10 : 16,
+        paddingBottom: Platform.OS === 'android' ? 95 : 28,
         alignItems: 'center',
         justifyContent: 'space-between',
     },

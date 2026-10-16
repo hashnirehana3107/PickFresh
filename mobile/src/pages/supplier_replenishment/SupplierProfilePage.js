@@ -797,7 +797,7 @@ const styles = StyleSheet.create({
     scrollBodyContent: {
         paddingHorizontal: 18,
         paddingTop: 18,
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 44 : 24,
     },
     saveToastBox: {
         backgroundColor: '#DCFCE7',
@@ -1098,7 +1098,7 @@ const styles = StyleSheet.create({
         borderTopColor: '#E2E8F0',
         paddingHorizontal: 18,
         paddingTop: 12,
-        paddingBottom: 14,
+        paddingBottom: Platform.OS === 'android' ? 24 : 14,
         gap: 8,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },

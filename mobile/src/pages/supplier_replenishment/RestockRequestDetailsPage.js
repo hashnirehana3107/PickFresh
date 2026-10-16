@@ -447,7 +447,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 16,
-        paddingBottom: 32,
+        paddingBottom: Platform.OS === 'android' ? 64 : 32,
     },
     successBanner: {
         flexDirection: 'row',

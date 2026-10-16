@@ -931,8 +931,8 @@ const styles = StyleSheet.create({
         borderTopColor: '#E2E8F0',
         paddingHorizontal: 8,
         paddingTop: 8,
-        paddingBottom: Platform.OS === 'ios' ? 20 : 8,
-        height: Platform.OS === 'ios' ? 76 : 64,
+        paddingBottom: Platform.OS === 'ios' ? 20 : (Platform.OS === 'android' ? 14 : 8),
+        height: Platform.OS === 'ios' ? 76 : (Platform.OS === 'android' ? 76 : 64),
     },
     navItem: {
         alignItems: 'center',

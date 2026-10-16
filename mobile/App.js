@@ -190,7 +190,19 @@ function MainApp() {
     setCurrentScreen(screenName);
   };
 
-  const SafeContainer = Platform.OS === 'web' ? View : SafeAreaView;
+  const SafeContainer = ({ style, children }) => {
+    if (Platform.OS === 'web') {
+      return <View style={style}>{children}</View>;
+    }
+    if (Platform.OS === 'android') {
+      return (
+        <View style={[style, { flex: 1, paddingTop: StatusBar.currentHeight || 24 }]}>
+          {children}
+        </View>
+      );
+    }
+    return <SafeAreaView style={style}>{children}</SafeAreaView>;
+  };
 
   if (isLoading) {
     return (

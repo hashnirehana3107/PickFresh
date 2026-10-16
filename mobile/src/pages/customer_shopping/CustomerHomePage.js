@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingHorizontal: 20,
         paddingTop: 20,
-        paddingBottom: 24,
+        paddingBottom: Platform.OS === 'android' ? 44 : 24,
         gap: 20,
     },
 

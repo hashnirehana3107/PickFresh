@@ -465,7 +465,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         padding: 16,
-        paddingBottom: 32,
+        paddingBottom: Platform.OS === 'android' ? 60 : 32,
     },
     centerBox: {
         paddingVertical: 32,
