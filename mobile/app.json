@@ -14,6 +14,11 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.pickfresh.mobile",
+      "permissions": [
+        "INTERNET",
+        "VIBRATE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -26,6 +31,12 @@
     },
     "plugins": [
       "expo-web-browser"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "54df6fc5-7259-4245-aa93-c37c9ea320b4"
+      }
+    },
+    "owner": "hash_rehana"
   }
 }
