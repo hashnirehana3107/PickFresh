@@ -9,13 +9,16 @@ let customerHomeCache = null;
 let customerHomeCacheTime = 0;
 let storesCache = null;
 let storesCacheTime = 0;
-const CACHE_TTL = 30 * 1000; // 30 seconds
+const CACHE_TTL = 15 * 1000; // 15 seconds TTL with instant invalidation on DB mutation
 
 const invalidateCustomerShoppingCache = () => {
     customerHomeCache = null;
     customerHomeCacheTime = 0;
     storesCache = null;
     storesCacheTime = 0;
+    if (typeof prewarmCustomerShoppingCache === 'function') {
+        prewarmCustomerShoppingCache().catch(() => {});
+    }
 };
 exports.invalidateCustomerHomeCache = invalidateCustomerShoppingCache;
 exports.invalidateCustomerShoppingCache = invalidateCustomerShoppingCache;
@@ -29,13 +32,182 @@ const getCategoryImageFallback = (catName = '', prodName = '') => {
     return '/cat_veg.png';
 };
 
+const resolveStoreLogo = (u) => {
+    let pic = u.picture || '';
+    if (!pic || pic.length > 500) {
+        const sName = (u.shopName || u.name || '').toLowerCase();
+        const sEmail = (u.email || '').toLowerCase();
+        if (sName.includes('grocery') || sEmail.includes('grocery')) {
+            return '/GroceryMart.jpg';
+        }
+        if (sName.includes('lanka') || sEmail.includes('lanka')) {
+            return '/logo.jpg';
+        }
+        return '/GroceryMart.jpg';
+    }
+    return pic;
+};
+
+// Builds the public customer home dataset from MongoDB Atlas with clean projections
+const buildCustomerHomeData = async () => {
+    if (mongoose.connection.readyState !== 1) {
+        try { await connectDB(); } catch (e) {}
+    }
+
+    // Execute MongoDB Atlas queries concurrently in parallel with .lean() and clean projection optimization
+    const [rawProducts, shopOwners, rawCategoryList, dbCategories] = await Promise.all([
+        Product.find({})
+            .select('name category price unit stock stockQuantity minStock brand storeName image imageUrl createdAt')
+            .sort({ createdAt: -1 })
+            .limit(10)
+            .lean()
+            .exec(),
+        User.find({ role: 'shop_owner' })
+            .select('name email shopName storeAddress address location phone rating storeStatus picture offerBanner')
+            .lean()
+            .exec(),
+        Product.find({}).select('category').lean().exec(),
+        Category.find({}).lean().exec()
+    ]);
+
+    let featuredProducts = (rawProducts || []).map(p => {
+        const imgUrl = p.imageUrl || p.image || '';
+        const fallbackImg = getCategoryImageFallback(p.category, p.name);
+        const hasValidImg = imgUrl && (imgUrl.startsWith('data:') || imgUrl.startsWith('http') || imgUrl.startsWith('/'));
+        return {
+            id: p._id.toString(),
+            _id: p._id.toString(),
+            name: p.name,
+            category: p.category || 'Grocery',
+            price: p.price,
+            unit: p.unit || '1kg',
+            stock: p.stock !== undefined ? p.stock : (p.stockQuantity !== undefined ? p.stockQuantity : 10),
+            minStock: p.minStock || 5,
+            brand: p.brand || '',
+            storeName: p.storeName || 'Lanka Mart',
+            image: hasValidImg ? imgUrl : fallbackImg,
+            useImageFile: !imgUrl.startsWith('data:')
+        };
+    });
+
+    let stores = (shopOwners || []).map((u, i) => {
+        const isClosed = u.storeStatus === 'closed';
+        const storeLoc = u.location || '';
+        const fullAddr = u.storeAddress || u.address || storeLoc || 'Colombo, Sri Lanka';
+        return {
+            id: u._id.toString(),
+            name: u.shopName || (u.name ? `${u.name}'s Store` : 'Fresh Grocery Store'),
+            email: u.email || '',
+            storeEmail: u.email || '',
+            ownerEmail: u.email || '',
+            ownerName: u.name || 'Shop Owner',
+            address: fullAddr,
+            storeAddress: u.storeAddress || '',
+            location: storeLoc,
+            picture: resolveStoreLogo(u),
+            distance: `${(1.0 + (i % 5) * 0.4).toFixed(1)} km`,
+            rating: u.rating || '4.9 ★',
+            status: isClosed ? 'Closed' : 'Open • Pick up in 30m',
+            storeStatus: u.storeStatus || 'open'
+        };
+    });
+
+    const countMap = {};
+    (rawCategoryList || []).forEach(p => {
+        if (p.category) {
+            const k = p.category.toLowerCase().trim();
+            countMap[k] = (countMap[k] || 0) + 1;
+        }
+    });
+
+    let topCategories = [];
+
+    if (dbCategories && dbCategories.length > 0) {
+        topCategories = dbCategories.map((cat) => {
+            const count = countMap[cat.name.toLowerCase()] || 0;
+            return {
+                id: cat._id.toString(),
+                name: cat.name,
+                items: `${count} ${count === 1 ? 'item' : 'items'}`,
+                count: count,
+                image: cat.image || '',
+                fallbackEmoji: cat.fallbackEmoji || '📦',
+                color: cat.color || '#E8F5E9',
+                textColor: cat.textColor || '#2E7D32'
+            };
+        });
+        topCategories.sort((a, b) => b.count - a.count);
+        topCategories = topCategories.slice(0, 6);
+    }
+
+    if (topCategories.length === 0) {
+        topCategories = [
+            { id: 1, name: 'Vegetables', items: '24 items', image: '/veg_icon.png', color: '#E8F5E9', textColor: '#2E7D32', fallbackEmoji: '🥕' },
+            { id: 2, name: 'Fruits', items: '12 items', image: '/fruit_icon.png', color: '#FFF3E0', textColor: '#E65100', fallbackEmoji: '🥑' },
+            { id: 3, name: 'Dairy', items: '8 items', image: '/dairy_icon.png', color: '#E3F2FD', textColor: '#1565C0', fallbackEmoji: '🥛' },
+            { id: 4, name: 'Bakery', items: '15 items', image: '/bakery_icon.png', color: '#FCE4EC', textColor: '#C2185B', fallbackEmoji: '🍞' }
+        ];
+    }
+
+    // Build ALL active banners from all registered store owners
+    const allBanners = (shopOwners || [])
+        .filter(s => s.offerBanner && s.offerBanner.hasCustomBanner !== false && s.offerBanner.active !== false && s.offerBanner.title && s.offerBanner.title.trim().length > 0)
+        .map(s => ({
+            ...s.offerBanner,
+            storeName: s.shopName || s.name || 'GroceryMart',
+            storeId: s._id.toString()
+        }));
+
+    // Fallback banner if no stores have created banners yet
+    const defaultBanner = {
+        badge: '🔥 20% OFF DEALS',
+        title: 'Fresh Harvest Deals',
+        subtitle: 'Pick up in 15 mins at nearest grocery store',
+        btnText: 'Shop Now',
+        active: true,
+        bannerBg: '/banner_bg.png',
+        storeName: 'GroceryMart'
+    };
+
+    const activeBanner = allBanners.length > 0 ? allBanners[0] : defaultBanner;
+
+    const responsePayload = {
+        success: true,
+        featuredProducts,
+        stores,
+        topCategories,
+        activeOrder: null,
+        activeBanner,
+        allBanners: allBanners.length > 0 ? allBanners : [defaultBanner]
+    };
+
+    // Cache public home data & stores
+    customerHomeCache = responsePayload;
+    customerHomeCacheTime = Date.now();
+    storesCache = stores;
+    storesCacheTime = Date.now();
+
+    return responsePayload;
+};
+
+const prewarmCustomerShoppingCache = async () => {
+    try {
+        await buildCustomerHomeData();
+        console.log('⚡ [PERFORMANCE] Customer Shopping RAM Cache pre-warmed successfully!');
+    } catch (e) {
+        console.warn('Customer shopping cache pre-warm warning:', e.message);
+    }
+};
+exports.prewarmCustomerShoppingCache = prewarmCustomerShoppingCache;
+
+// Kick off initial customer home pre-warm
+setTimeout(() => {
+    prewarmCustomerShoppingCache().catch(() => {});
+}, 350);
+
 // 1. GET Customer Home Data (Featured products, active order status, stores, top categories)
 exports.getCustomerHome = async (req, res) => {
     try {
-        if (mongoose.connection.readyState !== 1) {
-            try { await connectDB(); } catch (e) {}
-        }
-
         const isFresh = customerHomeCache && (Date.now() - customerHomeCacheTime < CACHE_TTL);
 
         // If cache is fresh and not an authenticated user needing unique active pre-order, return immediately (0ms)
@@ -55,92 +227,7 @@ exports.getCustomerHome = async (req, res) => {
             });
         }
 
-        // Execute MongoDB Atlas queries concurrently in parallel with .lean() optimization
-        const [rawProducts, shopOwners, rawCategoryList, dbCategories] = await Promise.all([
-            Product.find({}).sort({ createdAt: -1 }).limit(10).lean().exec(),
-            User.find({ role: 'shop_owner' }).select('name email shopName storeAddress address location phone rating storeStatus picture offerBanner').lean().exec(),
-            Product.find({}).select('category').lean().exec(),
-            Category.find({}).lean().exec()
-        ]);
-
-        let featuredProducts = rawProducts.map(p => {
-            const imgUrl = p.imageUrl || p.image || '';
-            const fallbackImg = getCategoryImageFallback(p.category, p.name);
-            const hasValidImg = imgUrl && (imgUrl.startsWith('data:') || imgUrl.startsWith('http') || imgUrl.startsWith('/'));
-            return {
-                id: p._id.toString(),
-                _id: p._id.toString(),
-                name: p.name,
-                category: p.category || 'Grocery',
-                price: p.price,
-                unit: p.unit || '1kg',
-                stock: p.stock !== undefined ? p.stock : (p.stockQuantity !== undefined ? p.stockQuantity : 10),
-                minStock: p.minStock || 5,
-                brand: p.brand || '',
-                storeName: p.storeName || 'Lanka Mart',
-                image: hasValidImg ? imgUrl : fallbackImg,
-                useImageFile: !imgUrl.startsWith('data:')
-            };
-        });
-
-        let stores = shopOwners.map((u, i) => {
-            const isClosed = u.storeStatus === 'closed';
-            const storeLoc = u.location || '';
-            const fullAddr = u.storeAddress || u.address || storeLoc || 'Colombo, Sri Lanka';
-            return {
-                id: u._id.toString(),
-                name: u.shopName || (u.name ? `${u.name}'s Store` : 'Fresh Grocery Store'),
-                email: u.email || '',
-                storeEmail: u.email || '',
-                ownerEmail: u.email || '',
-                ownerName: u.name || 'Shop Owner',
-                address: fullAddr,
-                storeAddress: u.storeAddress || '',
-                location: storeLoc,
-                picture: u.picture || '',
-                distance: `${(1.0 + (i % 5) * 0.4).toFixed(1)} km`,
-                rating: u.rating || '4.9 ★',
-                status: isClosed ? 'Closed' : 'Open • Pick up in 30m',
-                storeStatus: u.storeStatus || 'open'
-            };
-        });
-
-        const countMap = {};
-        (rawCategoryList || []).forEach(p => {
-            if (p.category) {
-                const k = p.category.toLowerCase().trim();
-                countMap[k] = (countMap[k] || 0) + 1;
-            }
-        });
-
-        let topCategories = [];
-
-        if (dbCategories.length > 0) {
-            topCategories = dbCategories.map((cat, idx) => {
-                const count = countMap[cat.name.toLowerCase()] || 0;
-                return {
-                    id: cat._id.toString(),
-                    name: cat.name,
-                    items: `${count} ${count === 1 ? 'item' : 'items'}`,
-                    count: count,
-                    image: cat.image || '',
-                    fallbackEmoji: cat.fallbackEmoji || '📦',
-                    color: cat.color || '#E8F5E9',
-                    textColor: cat.textColor || '#2E7D32'
-                };
-            });
-            topCategories.sort((a, b) => b.count - a.count);
-            topCategories = topCategories.slice(0, 6);
-        }
-
-        if (topCategories.length === 0) {
-            topCategories = [
-                { id: 1, name: 'Vegetables', items: '24 items', image: '/veg_icon.png', color: '#E8F5E9', textColor: '#2E7D32', fallbackEmoji: '🥕' },
-                { id: 2, name: 'Fruits', items: '12 items', image: '/fruit_icon.png', color: '#FFF3E0', textColor: '#E65100', fallbackEmoji: '🥑' },
-                { id: 3, name: 'Dairy', items: '8 items', image: '/dairy_icon.png', color: '#E3F2FD', textColor: '#1565C0', fallbackEmoji: '🥛' },
-                { id: 4, name: 'Bakery', items: '15 items', image: '/bakery_icon.png', color: '#FCE4EC', textColor: '#C2185B', fallbackEmoji: '🍞' }
-            ];
-        }
+        const data = await buildCustomerHomeData();
 
         // Active pre-order for user if logged in
         let activeOrder = null;
@@ -148,45 +235,10 @@ exports.getCustomerHome = async (req, res) => {
             activeOrder = await Order.findOne({ customer: req.user._id, status: { $in: ['Pending', 'Preparing', 'Ready for Pickup'] } }).sort({ createdAt: -1 }).lean().exec();
         }
 
-        // Build ALL active banners from all registered store owners
-        const allBanners = shopOwners
-            .filter(s => s.offerBanner && s.offerBanner.hasCustomBanner !== false && s.offerBanner.active !== false && s.offerBanner.title && s.offerBanner.title.trim().length > 0)
-            .map(s => ({
-                ...s.offerBanner,
-                storeName: s.shopName || s.name || 'GroceryMart',
-                storeId: s._id.toString()
-            }));
-
-        // Fallback banner if no stores have created banners yet
-        const defaultBanner = {
-            badge: '🔥 20% OFF DEALS',
-            title: 'Fresh Harvest Deals',
-            subtitle: 'Pick up in 15 mins at nearest grocery store',
-            btnText: 'Shop Now',
-            active: true,
-            bannerBg: '/banner_bg.png',
-            storeName: 'GroceryMart'
-        };
-
-        const activeBanner = allBanners.length > 0 ? allBanners[0] : defaultBanner;
-
-        const responsePayload = {
-            success: true,
-            featuredProducts,
-            stores,
-            topCategories,
-            activeOrder,
-            activeBanner,
-            allBanners: allBanners.length > 0 ? allBanners : [defaultBanner]
-        };
-
-        // Cache public home data & stores
-        customerHomeCache = responsePayload;
-        customerHomeCacheTime = Date.now();
-        storesCache = stores;
-        storesCacheTime = Date.now();
-
-        return res.json(responsePayload);
+        return res.json({
+            ...data,
+            activeOrder
+        });
     } catch (error) {
         console.error('Error fetching customer home data:', error);
         return res.status(500).json({ success: false, message: error.message });
@@ -216,7 +268,7 @@ exports.getStores = async (req, res) => {
                 address: fullAddr,
                 storeAddress: u.storeAddress || '',
                 location: storeLoc,
-                picture: u.picture || '',
+                picture: resolveStoreLogo(u),
                 distance: `${(1.2 + (i % 5) * 0.4).toFixed(1)} km`,
                 rating: u.rating || '4.9',
                 reviews: 45 + (i * 12),
@@ -255,87 +307,6 @@ exports.searchCustomerShopping = async (req, res) => {
         res.status(500).json({ success: false, message: error.message });
     }
 };
-
-// Background pre-warmer for customer shopping cache
-const prewarmCustomerShoppingCache = async () => {
-    try {
-        const [rawProducts, shopOwners, rawCategoryList, dbCategories] = await Promise.all([
-            Product.find({}).sort({ createdAt: -1 }).limit(10).lean().exec(),
-            User.find({ role: 'shop_owner' }).select('name email shopName storeAddress address location phone rating storeStatus picture offerBanner').lean().exec(),
-            Product.find({}).select('category').lean().exec(),
-            Category.find({}).lean().exec()
-        ]);
-
-        let featuredProducts = rawProducts.map(p => {
-            const imgUrl = p.imageUrl || p.image || '';
-            const fallbackImg = getCategoryImageFallback(p.category, p.name);
-            const hasValidImg = imgUrl && (imgUrl.startsWith('data:') || imgUrl.startsWith('http') || imgUrl.startsWith('/'));
-            return {
-                id: p._id.toString(),
-                _id: p._id.toString(),
-                name: p.name,
-                category: p.category || 'Grocery',
-                price: p.price,
-                unit: p.unit || '1kg',
-                stock: p.stock !== undefined ? p.stock : (p.stockQuantity !== undefined ? p.stockQuantity : 10),
-                minStock: p.minStock || 5,
-                brand: p.brand || '',
-                storeName: p.storeName || 'Lanka Mart',
-                image: hasValidImg ? imgUrl : fallbackImg,
-                useImageFile: !imgUrl.startsWith('data:')
-            };
-        });
-
-        let stores = shopOwners.map((u, i) => {
-            const isClosed = u.storeStatus === 'closed';
-            const storeLoc = u.location || '';
-            const fullAddr = u.storeAddress || u.address || storeLoc || 'Colombo, Sri Lanka';
-            return {
-                id: u._id.toString(),
-                name: u.shopName || (u.name ? `${u.name}'s Store` : 'Fresh Grocery Store'),
-                email: u.email || '',
-                storeEmail: u.email || '',
-                ownerEmail: u.email || '',
-                ownerName: u.name || 'Shop Owner',
-                address: fullAddr,
-                storeAddress: u.storeAddress || '',
-                location: storeLoc,
-                picture: u.picture || '',
-                distance: `${(1.0 + (i % 5) * 0.4).toFixed(1)} km`,
-                rating: u.rating || '4.9 ★',
-                status: isClosed ? 'Closed' : 'Open • Pick up in 30m',
-                storeStatus: u.storeStatus || 'open'
-            };
-        });
-
-        const defaultBanner = {
-            badge: '🔥 20% OFF DEALS',
-            title: 'Fresh Harvest Deals',
-            subtitle: 'Pick up in 15 mins at nearest grocery store',
-            btnText: 'Shop Now',
-            active: true,
-            bannerBg: '/banner_bg.png',
-            storeName: 'GroceryMart'
-        };
-
-        customerHomeCache = {
-            success: true,
-            featuredProducts,
-            stores,
-            topCategories: [],
-            activeOrder: null,
-            activeBanner: defaultBanner,
-            allBanners: [defaultBanner]
-        };
-        customerHomeCacheTime = Date.now();
-        storesCache = stores;
-        storesCacheTime = Date.now();
-        console.log('⚡ [PERFORMANCE] Customer Shopping RAM Cache pre-warmed with', featuredProducts.length, 'featured products &', stores.length, 'stores!');
-    } catch (e) {
-        console.warn('Customer shopping cache prewarm skipped:', e.message);
-    }
-};
-setTimeout(prewarmCustomerShoppingCache, 1200);
 
 // 3. GET Product Details
 exports.getProductDetails = async (req, res) => {

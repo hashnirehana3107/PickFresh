@@ -1,5 +1,16 @@
 const Product = require('../models/Product');
 
+const triggerCachesInvalidation = () => {
+    try {
+        const { invalidateProductsCache } = require('../product_inventory/productInventoryController');
+        if (typeof invalidateProductsCache === 'function') invalidateProductsCache();
+    } catch (e) {}
+    try {
+        const { invalidateCustomerShoppingCache } = require('../customer_shopping/customerShoppingController');
+        if (typeof invalidateCustomerShoppingCache === 'function') invalidateCustomerShoppingCache();
+    } catch (e) {}
+};
+
 // Sample mock seed products if database is empty
 const seedProducts = [
     { name: 'Fresh Red Tomatoes', category: 'Vegetables', price: 320, unit: 'kg', stockQuantity: 45, lowStockThreshold: 10, stockStatus: 'In Stock', description: 'Fresh farm red tomatoes' },
@@ -25,7 +36,7 @@ exports.getProducts = async (req, res) => {
             query.ownerEmail = req.query.storeEmail.toLowerCase();
         }
 
-        let products = await Product.find(query);
+        let products = await Product.find(query).select('-storeIcon').lean().exec();
 
         // Auto seed mock data only if the ENTIRE database is empty and we aren't filtering for a specific shop owner's storeEmail.
         if (products.length === 0 && !req.query.search && !req.query.storeEmail) {
@@ -45,7 +56,7 @@ exports.getProducts = async (req, res) => {
 // @route GET /api/products/:id
 exports.getProductById = async (req, res) => {
     try {
-        const product = await Product.findById(req.params.id);
+        const product = await Product.findById(req.params.id).select('-storeIcon').lean().exec();
         if (!product) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
@@ -60,6 +71,7 @@ exports.getProductById = async (req, res) => {
 exports.createProduct = async (req, res) => {
     try {
         const { name, category, price, unit, brand, stockQuantity, lowStockThreshold, description, supplierName, storeEmail, storeName, storeIcon } = req.body;
+        const cleanStoreIcon = (storeIcon && storeIcon.length < 500) ? storeIcon : '';
         const product = await Product.create({
             name,
             category,
@@ -72,8 +84,11 @@ exports.createProduct = async (req, res) => {
             supplierName: supplierName || 'Local Supplier',
             ownerEmail: storeEmail ? storeEmail.toLowerCase() : '',
             storeName: storeName || 'PickFresh Super',
-            storeIcon: storeIcon || ''
+            storeIcon: cleanStoreIcon
         });
+
+        triggerCachesInvalidation();
+
         res.status(201).json({ success: true, message: 'Product created successfully', product });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
@@ -89,8 +104,14 @@ exports.updateProduct = async (req, res) => {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
 
+        if (req.body.storeIcon && req.body.storeIcon.length > 500) {
+            delete req.body.storeIcon;
+        }
+
         Object.assign(product, req.body);
         await product.save();
+
+        triggerCachesInvalidation();
 
         res.json({ success: true, message: 'Product updated successfully', product });
     } catch (error) {
@@ -106,6 +127,9 @@ exports.deleteProduct = async (req, res) => {
         if (!product) {
             return res.status(404).json({ success: false, message: 'Product not found' });
         }
+
+        triggerCachesInvalidation();
+
         res.json({ success: true, message: 'Product deleted successfully' });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });

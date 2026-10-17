@@ -407,6 +407,7 @@ const invalidateProductsCache = () => {
     productsMemoryCache = null;
     productsMemoryCacheTime = 0;
     invalidateDashboardCache();
+    notifyCustomerCacheInvalidation();
     prewarmProductsCache().catch(() => {});
 };
 exports.invalidateProductsCache = invalidateProductsCache;
@@ -434,6 +435,9 @@ const formatProductDoc = (p) => {
     const cleanStoreEmail = (p.storeEmail || p.ownerEmail || '').toLowerCase().trim();
     const defaultStore = cleanOwnerEmail.includes('grocery') ? 'GroceryMart' : 'LankaMart';
 
+    // Guard against oversized storeIcon on product level
+    const cleanStoreIcon = (p.storeIcon && typeof p.storeIcon === 'string' && p.storeIcon.length < 500) ? p.storeIcon : '';
+
     return {
         id: (p._id || p.id).toString(),
         _id: (p._id || p.id).toString(),
@@ -451,10 +455,10 @@ const formatProductDoc = (p) => {
         supplierName: p.supplierName || 'Central Food City',
         ownerEmail: cleanOwnerEmail,
         storeEmail: cleanStoreEmail,
-        storeIcon: p.storeIcon || '',
+        storeIcon: cleanStoreIcon,
         category: p.category || 'Grocery',
         image: finalImg,
-        imageUrl: finalImg,
+        imageUrl: (p.imageUrl && p.imageUrl.length < 500 && p.imageUrl !== finalImg) ? p.imageUrl : finalImg,
         fallbackEmoji: p.fallbackEmoji || '📦',
         bgColor: p.bgColor || '#EFF6FF',
         createdAt: p.createdAt || new Date(),
@@ -464,7 +468,7 @@ const formatProductDoc = (p) => {
 
 const prewarmProductsCache = async () => {
     try {
-        const products = await Product.find({}).sort({ createdAt: -1 }).lean();
+        const products = await Product.find({}).select('-storeIcon').sort({ createdAt: -1 }).lean();
         if (products && products.length > 0) {
             productsMemoryCache = products.map(formatProductDoc);
             productsMemoryCacheTime = Date.now();
@@ -512,8 +516,8 @@ exports.getProducts = async (req, res) => {
         const storeNameParam = (req.query.storeName || '').toLowerCase().trim();
         const explicitRefresh = req.query.refresh === 'true';
 
-        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 2s)
-        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 2000)) {
+        // 1. Return from synchronized RAM cache instantly (<5ms) if fresh (TTL 15s)
+        if (!explicitRefresh && productsMemoryCache && productsMemoryCache.length > 0 && (now - productsMemoryCacheTime < 15000)) {
             const filtered = productsMemoryCache.filter(p => matchesStoreFilter(p, storeEmailParam, storeNameParam));
             return res.json({ success: true, count: filtered.length, products: filtered });
         }
@@ -540,29 +544,22 @@ exports.getProducts = async (req, res) => {
             query.$or = orList;
         }
 
-        let products = await Product.find(query).sort({ createdAt: -1 }).lean().maxTimeMS(10000);
+        let products = await Product.find(query).select('-storeIcon').sort({ createdAt: -1 }).lean().maxTimeMS(10000);
 
         if ((!products || products.length === 0) && !storeEmailParam) {
-            products = await Product.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(10000);
+            products = await Product.find({}).select('-storeIcon').sort({ createdAt: -1 }).lean().maxTimeMS(10000);
         }
 
         const formattedProducts = (products || []).map(formatProductDoc);
 
-        if (!productsMemoryCache || productsMemoryCache.length === 0 || !storeEmailParam) {
+        // Synchronize cache accurately WITHOUT resurrecting deleted products
+        if (!storeEmailParam && !storeNameParam) {
             productsMemoryCache = formattedProducts;
-            productsMemoryCacheTime = Date.now();
         } else {
-            formattedProducts.forEach(fp => {
-                const idStr = String(fp.id || fp._id);
-                const idx = productsMemoryCache.findIndex(p => String(p.id || p._id) === idStr);
-                if (idx !== -1) {
-                    productsMemoryCache[idx] = fp;
-                } else {
-                    productsMemoryCache.unshift(fp);
-                }
-            });
-            productsMemoryCacheTime = Date.now();
+            const otherStoresProducts = (productsMemoryCache || []).filter(p => !matchesStoreFilter(p, storeEmailParam, storeNameParam));
+            productsMemoryCache = [...formattedProducts, ...otherStoresProducts];
         }
+        productsMemoryCacheTime = Date.now();
 
         const filtered = (productsMemoryCache || formattedProducts).filter(p => matchesStoreFilter(p, storeEmailParam, storeNameParam));
         return res.json({ success: true, count: filtered.length, products: filtered });

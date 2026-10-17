@@ -47,11 +47,14 @@ productSchema.pre('save', function (next) {
     if (this.minStock === undefined && this.lowStockThreshold !== undefined) {
         this.minStock = this.lowStockThreshold;
     }
-    if (this.image && !this.imageUrl) {
+    if (this.image && !this.imageUrl && this.image.length < 500) {
         this.imageUrl = this.image;
     }
-    if (this.imageUrl && !this.image) {
+    if (this.imageUrl && !this.image && this.imageUrl.length < 500) {
         this.image = this.imageUrl;
+    }
+    if (this.storeIcon && this.storeIcon.length > 500) {
+        this.storeIcon = '';
     }
 
     if (this.stock <= 0) {

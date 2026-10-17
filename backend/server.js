@@ -3,6 +3,8 @@ const cors = require('cors');
 const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 
+const compression = require('compression');
+
 // Load environment variables
 dotenv.config();
 
@@ -17,10 +19,17 @@ connectDB().then(() => {
         if (prewarmProductsCache) {
             prewarmProductsCache().catch(() => { });
         }
+        const { prewarmCustomerShoppingCache } = require('./customer_shopping/customerShoppingController');
+        if (prewarmCustomerShoppingCache) {
+            prewarmCustomerShoppingCache().catch(() => { });
+        }
     } catch (e) { }
 });
 
 const app = express();
+
+// High performance response compression (Gzip / Deflate)
+app.use(compression());
 
 // Body Parser & CORS Middleware
 app.use(cors());

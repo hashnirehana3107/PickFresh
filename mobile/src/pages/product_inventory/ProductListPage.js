@@ -28,15 +28,59 @@ import { useAuth } from '../../context/AuthContext';
 import { API_BASE_URL } from '../../config/api';
 import DeleteProductModal from './DeleteProductModal';
 
+function resolveProductCardImage(product) {
+    const raw = product?.imageUrl || product?.image;
+    if (typeof raw === 'string' && (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:image'))) {
+        return { uri: raw };
+    }
+    const name = (product?.name || '').toLowerCase();
+    const cat = (product?.category || '').toLowerCase();
+    if (name.includes('butter') || name.includes('anchor')) return require('../../../assets/Pic117561.jpg');
+    if (name.includes('7 up') || name.includes('7up')) return require('../../../assets/7 Up Pet Bottle 1L.jpeg');
+    if (name.includes('sprite')) return require('../../../assets/Sprite 1L Bottle.jpg');
+    if (name.includes('coca') || name.includes('coke')) return require('../../../assets/Coca Cola Pet Bottle 1.05L.jpg');
+    if (name.includes('milk') || cat.includes('dairy')) return require('../../../assets/highland_milk.png');
+    if (name.includes('chicken') || name.includes('meat') || cat.includes('meat')) return require('../../../assets/meat.webp');
+    if (name.includes('soap') || name.includes('dove') || name.includes('lux')) return require('../../../assets/Dove Beauty Cream Soap 100g.jpg');
+    if (name.includes('tomato') || name.includes('carrot') || name.includes('bean') || cat.includes('veg')) return require('../../../assets/vegetables.jpg');
+    if (name.includes('apple') || name.includes('avocado') || name.includes('grape') || cat.includes('fruit')) return require('../../../assets/fruits.webp');
+    if (name.includes('rice') || cat.includes('grain')) return require('../../../assets/grains.jpg');
+    return null;
+}
+
+// Module-level RAM cache to preserve products across subscreen navigations (Add Product, Edit Product, etc.)
+let globalProductsMemoryCache = [];
+
 export default function ProductListPage({ onNavigate, initialFilter, initialParams, onProductsUpdated }) {
     const { user } = useAuth();
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedCategory, setSelectedCategory] = useState(initialFilter || 'All');
-    const [products, setProducts] = useState(initialParams?.newProduct ? [initialParams.newProduct] : []);
+
+    const getInitialProducts = () => {
+        const targetNew = initialParams?.newProduct;
+        if (targetNew) {
+            const newId = String(targetNew.id || targetNew._id);
+            const filteredCache = (globalProductsMemoryCache || []).filter(
+                (p) => String(p.id || p._id) !== newId
+            );
+            if (filteredCache.length > 0) {
+                const merged = [targetNew, ...filteredCache];
+                globalProductsMemoryCache = merged;
+                return merged;
+            }
+            return [targetNew];
+        }
+        return globalProductsMemoryCache && globalProductsMemoryCache.length > 0 ? globalProductsMemoryCache : [];
+    };
+
+    const [products, setProducts] = useState(getInitialProducts);
     const [deletedIds, setDeletedIds] = useState(new Set());
     const deletedIdsRef = useRef(new Set());
     const [categories, setCategories] = useState(['All', 'Low Stock', 'Dairy & Eggs', 'Vegetables', 'Fruits', 'Meat & Seafood', 'Bakery', 'Beverages']);
-    const [isLoading, setIsLoading] = useState(!initialParams?.newProduct);
+    const [isLoading, setIsLoading] = useState(() => {
+        if (globalProductsMemoryCache && globalProductsMemoryCache.length > 0) return false;
+        return !initialParams?.newProduct;
+    });
     const [isRefreshing, setIsRefreshing] = useState(false);
     const [deletingProduct, setDeletingProduct] = useState(null);
     const catScrollRef = useRef(null);
@@ -100,14 +144,31 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
             const data = await res.json();
             if (data.success && Array.isArray(data.products)) {
                 const currentDeleted = deletedIdsRef.current;
-                const cleanProducts = data.products.filter(
+                let cleanProducts = data.products.filter(
                     (p) => !currentDeleted.has(String(p.id || p._id))
                 );
-                setProducts(cleanProducts);
-                try {
-                    const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-                    AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(cleanProducts)).catch(() => {});
-                } catch (e) {}
+
+                // Ensure newly added product stays at index 0 (top of list)
+                const targetNew = initialParams?.newProduct;
+                if (targetNew) {
+                    const targetId = String(targetNew.id || targetNew._id);
+                    const idx = cleanProducts.findIndex((p) => String(p.id || p._id) === targetId);
+                    if (idx > 0) {
+                        const [item] = cleanProducts.splice(idx, 1);
+                        cleanProducts.unshift(item);
+                    } else if (idx === -1) {
+                        cleanProducts.unshift(targetNew);
+                    }
+                }
+
+                if (cleanProducts.length > 0) {
+                    globalProductsMemoryCache = cleanProducts;
+                    setProducts(cleanProducts);
+                    try {
+                        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+                        AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(cleanProducts)).catch(() => {});
+                    } catch (e) {}
+                }
             }
         } catch (err) {
             console.warn('Failed to fetch products:', err);
@@ -155,7 +216,21 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
                         const cleanCached = parsed.filter(
                             (p) => !delSet.has(String(p.id || p._id))
                         );
-                        setProducts((prev) => (prev.length === 0 ? cleanCached : prev));
+                        setProducts((prev) => {
+                            const targetNew = initialParams?.newProduct;
+                            if (targetNew) {
+                                const targetId = String(targetNew.id || targetNew._id);
+                                const others = cleanCached.filter((p) => String(p.id || p._id) !== targetId);
+                                const merged = [targetNew, ...others];
+                                globalProductsMemoryCache = merged;
+                                return merged;
+                            }
+                            if (prev.length <= 1) {
+                                globalProductsMemoryCache = cleanCached;
+                                return cleanCached;
+                            }
+                            return prev;
+                        });
                         setIsLoading(false);
                     }
                 }
@@ -181,8 +256,12 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
         if (initialParams.newProduct) {
             setProducts((prev) => {
                 const idStr = String(initialParams.newProduct.id || initialParams.newProduct._id);
-                const filtered = prev.filter((p) => String(p.id || p._id) !== idStr);
+                const sourceList = (prev && prev.length > 1)
+                    ? prev
+                    : (globalProductsMemoryCache && globalProductsMemoryCache.length > 0 ? globalProductsMemoryCache : prev);
+                const filtered = sourceList.filter((p) => String(p.id || p._id) !== idStr);
                 const nextList = [initialParams.newProduct, ...filtered];
+                globalProductsMemoryCache = nextList;
                 try {
                     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
                     AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(nextList)).catch(() => {});
@@ -194,7 +273,11 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
         } else if (initialParams.updatedProduct) {
             setProducts((prev) => {
                 const idStr = String(initialParams.updatedProduct.id || initialParams.updatedProduct._id);
-                const nextList = prev.map((p) => (String(p.id || p._id) === idStr ? { ...p, ...initialParams.updatedProduct } : p));
+                const sourceList = (prev && prev.length > 1)
+                    ? prev
+                    : (globalProductsMemoryCache && globalProductsMemoryCache.length > 0 ? globalProductsMemoryCache : prev);
+                const nextList = sourceList.map((p) => (String(p.id || p._id) === idStr ? { ...p, ...initialParams.updatedProduct } : p));
+                globalProductsMemoryCache = nextList;
                 try {
                     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
                     AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(nextList)).catch(() => {});
@@ -209,7 +292,11 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
             setDeletedIds(new Set(deletedIdsRef.current));
             saveDeletedIdToStorage(idStr);
             setProducts((prev) => {
-                const updated = prev.filter((p) => String(p.id || p._id) !== idStr);
+                const sourceList = (prev && prev.length > 0)
+                    ? prev
+                    : (globalProductsMemoryCache && globalProductsMemoryCache.length > 0 ? globalProductsMemoryCache : prev);
+                const updated = sourceList.filter((p) => String(p.id || p._id) !== idStr);
+                globalProductsMemoryCache = updated;
                 try {
                     const AsyncStorage = require('@react-native-async-storage/async-storage').default;
                     AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(updated)).catch(() => {});
@@ -245,6 +332,7 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
         // Optimistic UI update: immediately remove from view and cache
         setProducts((prev) => {
             const updated = prev.filter((p) => String(p.id || p._id) !== idStr);
+            globalProductsMemoryCache = updated;
             try {
                 const AsyncStorage = require('@react-native-async-storage/async-storage').default;
                 AsyncStorage.setItem('@pickfresh_products_cache', JSON.stringify(updated)).catch(() => {});
@@ -452,17 +540,20 @@ export default function ProductListPage({ onNavigate, initialFilter, initialPara
                                 <View key={pId} style={styles.productCard}>
                                     {/* Thumbnail Image */}
                                     <View style={styles.cardImgWrap}>
-                                        {product.image ? (
-                                            <Image
-                                                source={{ uri: product.image }}
-                                                style={styles.cardImg}
-                                                resizeMode="cover"
-                                            />
-                                        ) : (
-                                            <View style={styles.cardFallbackWrap}>
-                                                <Package size={24} color="#166534" />
-                                            </View>
-                                        )}
+                                        {(() => {
+                                            const imgSource = resolveProductCardImage(product);
+                                            return imgSource ? (
+                                                <Image
+                                                    source={imgSource}
+                                                    style={styles.cardImg}
+                                                    resizeMode="cover"
+                                                />
+                                            ) : (
+                                                <View style={styles.cardFallbackWrap}>
+                                                    <Package size={24} color="#166534" />
+                                                </View>
+                                            );
+                                        })()}
                                     </View>
 
                                     {/* Card Body */}

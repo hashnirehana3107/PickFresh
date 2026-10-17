@@ -24,50 +24,8 @@ import { API_BASE_URL } from '../../config/api';
 // Module-level RAM cache for instant tab transitions
 let cachedStores = null;
 
-const DEFAULT_STORES = [
-    {
-        id: 'default_1',
-        name: 'GroceryMart',
-        ownerName: 'Kamal Bandara',
-        address: 'No, 39/A, Main Road, Kandy',
-        location: 'Kandy',
-        distance: '1.0 km',
-        rating: '4.9',
-        reviews: 48,
-        status: 'Open • Pick up in 30m',
-        storeStatus: 'open',
-        timing: '8:00 AM - 10:00 PM',
-        itemsCount: '100+ products'
-    },
-    {
-        id: 'default_2',
-        name: 'LankaMart',
-        ownerName: 'LankaMart Owner',
-        address: 'No. 89, D.S. Senanayake Veediya, Kandy',
-        location: 'Kandy',
-        distance: '1.2 km',
-        rating: '4.8',
-        reviews: 36,
-        status: 'Open • Pick up in 30m',
-        storeStatus: 'open',
-        timing: '8:00 AM - 10:00 PM',
-        itemsCount: '100+ products'
-    },
-    {
-        id: 'default_3',
-        name: 'Green Basket Grocery',
-        ownerName: 'Shop Owner',
-        address: 'Colombo 03, Sri Lanka',
-        location: 'Colombo 03',
-        distance: '2.5 km',
-        rating: '4.9',
-        reviews: 52,
-        status: 'Open • Pick up in 30m',
-        storeStatus: 'open',
-        timing: '8:00 AM - 10:00 PM',
-        itemsCount: '100+ products'
-    }
-];
+// Strictly real stores from database (NO fake dummy data)
+const DEFAULT_STORES = [];
 
 // Helper to resolve store picture with fallbacks
 function resolveStorePic(picture, storeName = '') {
@@ -97,8 +55,8 @@ export default function CustomerStoresPage({ onNavigate, onSelectStore, selected
     const { user } = useAuth();
     const [searchQuery, setSearchQuery] = useState('');
     const [filterOption, setFilterOption] = useState('All');
-    const [stores, setStores] = useState(cachedStores && cachedStores.length > 0 ? cachedStores : DEFAULT_STORES);
-    const [isLoading, setIsLoading] = useState(!cachedStores && !DEFAULT_STORES.length);
+    const [stores, setStores] = useState(cachedStores && cachedStores.length > 0 ? cachedStores : []);
+    const [isLoading, setIsLoading] = useState(!cachedStores || cachedStores.length === 0);
 
     useEffect(() => {
         let isMounted = true;

@@ -155,7 +155,7 @@ exports.getSupplierCatalog = async (req, res) => {
                 try {
                     const SupplierProductCatalog = require('../models/SupplierProductCatalog');
                     const fresh = await SupplierProductCatalog.find({}).sort({ createdAt: -1 }).lean().maxTimeMS(10000);
-                    if (fresh && fresh.length > 0) {
+                    if (Array.isArray(fresh)) {
                         supplierCatalogCache = fresh;
                         supplierCatalogCacheTime = Date.now();
                         buildGlobalCatalogMap();
@@ -1197,7 +1197,9 @@ exports.createNotification = async (req, res) => {
 
 // 10. Supplier Catalog Management (CRUD)
 const SupplierProductCatalog = require('../models/SupplierProductCatalog');
-const invalidateCatalogCache = () => { };
+const invalidateCatalogCache = () => {
+    clearSupplierCaches();
+};
 const clearSupplierCaches = () => {
     try {
         globalCatalogMapCache = { timestamp: 0, map: new Map() };

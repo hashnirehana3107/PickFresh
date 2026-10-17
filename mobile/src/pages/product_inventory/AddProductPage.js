@@ -42,7 +42,7 @@ const UNITS_LIST = ['1kg', '500g', '250g', 'pack', 'bottle', 'loaf', 'bag', 'lit
 
 export default function AddProductPage({ onNavigate }) {
     const { user } = useAuth();
-    const storeName = user?.shopName || user?.storeName || user?.name || 'Lanka Mart';
+    const storeName = user?.shopName || user?.storeName || user?.name || 'GroceryMart';
 
     const [name, setName] = useState('');
     const [brand, setBrand] = useState('');
@@ -386,8 +386,8 @@ export default function AddProductPage({ onNavigate }) {
             supplierName: activeSupplierName,
             supplierEmail: resolvedSupplierEmail,
             storeName,
-            storeEmail: user?.email || '',
-            ownerEmail: user?.email || '',
+            storeEmail: user?.email || (storeName.toLowerCase().includes('lanka') ? 'lankamart@gmail.com' : 'grocerymart@gmail.com'),
+            ownerEmail: user?.email || (storeName.toLowerCase().includes('lanka') ? 'lankamart@gmail.com' : 'grocerymart@gmail.com'),
             storeIcon: user?.picture || '',
             image: imagePreview || '',
             fallbackEmoji: getFallbackEmoji(category),

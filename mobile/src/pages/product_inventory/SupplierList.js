@@ -48,110 +48,9 @@ const resolveImageUrl = (img) => {
     return `${API_HOST || 'http://localhost:5000'}${cleanImg}`;
 };
 
-const DEFAULT_GROCERYMART_DELIVERIES = [
-    {
-        id: 'del_po_0003',
-        poId: 'PO-0003',
-        storeName: 'GroceryMart',
-        storeEmail: 'grocerymart@gmail.com',
-        supplierName: 'Lanka Mega Wholesale Distributors',
-        status: 'Pending Approval',
-        etaMinutes: 24,
-        items: [
-            {
-                produce: 'Surf Excel Laundry Detergent Powder',
-                name: 'Surf Excel Laundry Detergent Powder',
-                qty: 10,
-                unit: '1kg',
-                wholesaleRate: 475,
-                subtotal: 4750,
-                image: 'https://images.unsplash.com/photo-1583947215259-38e31be8751f?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-                produce: 'Maliban Krisco - 170g',
-                name: 'Maliban Krisco - 170g',
-                qty: 10,
-                unit: 'pack',
-                wholesaleRate: 320,
-                subtotal: 3200,
-                image: 'https://images.unsplash.com/photo-1558961363-fa8fdf82db35?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-                produce: 'Coca Cola Pet Bottle 1.05L',
-                name: 'Coca Cola Pet Bottle 1.05L',
-                qty: 10,
-                unit: 'bottle',
-                wholesaleRate: 240,
-                subtotal: 2400,
-                image: 'https://images.unsplash.com/photo-1622483767028-3f66f32aef97?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-                produce: 'Ratthi Full Cream Milk Powder - 400g',
-                name: 'Ratthi Full Cream Milk Powder - 400g',
-                qty: 10,
-                unit: 'pack',
-                wholesaleRate: 1200,
-                subtotal: 12000,
-                image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80',
-            },
-        ],
-        totalAmount: 22350,
-    },
-    {
-        id: 'del_po_0002',
-        poId: 'PO-0002',
-        storeName: 'GroceryMart',
-        storeEmail: 'grocerymart@gmail.com',
-        supplierName: 'Central Food City',
-        status: 'Delivered',
-        etaMinutes: 24,
-        items: [
-            {
-                produce: 'Anchor Butter Salted 100g',
-                name: 'Anchor Butter Salted 100g',
-                qty: 25,
-                unit: 'pack',
-                wholesaleRate: 650,
-                subtotal: 16250,
-                image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=300&auto=format&fit=crop&q=80',
-            },
-        ],
-        totalAmount: 16250,
-    },
-];
-
-const DEFAULT_LANKAMART_DELIVERIES = [
-    {
-        id: 'del_po_0001',
-        poId: 'PO-0001',
-        storeName: 'LankaMart',
-        storeEmail: 'lankamart@gmail.com',
-        supplierName: 'Central Food City',
-        status: 'Delivered',
-        etaMinutes: 24,
-        items: [
-            {
-                produce: 'Anchor Butter Salted 100g',
-                name: 'Anchor Butter Salted 100g',
-                qty: 20,
-                unit: 'pack',
-                wholesaleRate: 650,
-                subtotal: 13000,
-                image: 'https://images.unsplash.com/photo-1589985270826-4b7bb135bc9d?w=300&auto=format&fit=crop&q=80',
-            },
-            {
-                produce: 'Fresh Cow Milk 1L',
-                name: 'Fresh Cow Milk 1L',
-                qty: 10,
-                unit: 'bottle',
-                wholesaleRate: 500,
-                subtotal: 5000,
-                image: 'https://images.unsplash.com/photo-1550583724-b2692b85b150?w=300&auto=format&fit=crop&q=80',
-            },
-        ],
-        totalAmount: 18000,
-    },
-];
+// Real live deliveries strictly from database (NO fake dummy deliveries)
+const DEFAULT_GROCERYMART_DELIVERIES = [];
+const DEFAULT_LANKAMART_DELIVERIES = [];
 
 export default function SupplierListPage({ onNavigate }) {
     const { user } = useAuth();
@@ -225,9 +124,7 @@ export default function SupplierListPage({ onNavigate }) {
             } else if (data.delivery) {
                 deliveries = [data.delivery];
             } else {
-                deliveries = currentStoreName.toLowerCase().includes('lanka')
-                    ? DEFAULT_LANKAMART_DELIVERIES
-                    : DEFAULT_GROCERYMART_DELIVERIES;
+                deliveries = [];
             }
 
             // Client-side store isolation guarantee: strictly retain orders belonging to THIS store only
@@ -248,10 +145,7 @@ export default function SupplierListPage({ onNavigate }) {
             setLiveDeliveries(filteredForStore.length > 0 ? filteredForStore : deliveries);
         } catch (err) {
             console.warn('Failed to fetch live deliveries:', err);
-            const fallback = currentStoreName.toLowerCase().includes('lanka')
-                ? DEFAULT_LANKAMART_DELIVERIES
-                : DEFAULT_GROCERYMART_DELIVERIES;
-            setLiveDeliveries(fallback);
+            setLiveDeliveries([]);
         } finally {
             setTrackingLoading(false);
         }
